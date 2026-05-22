@@ -1,8 +1,17 @@
 node_modules/
 dist/
+dist-ssr/
 app-repo/
 app-live/
 worktrees/
+
 *.log
+*.local
 .env
+.env.*
 data.json
+
+.DS_Store
+*.sw?
+.idea/
+.vscode/
