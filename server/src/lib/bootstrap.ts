@@ -46,9 +46,7 @@ export async function deployLive(): Promise<void> {
     console.log('[live] Cloning app repo for live server...');
     await execAsync(`git clone ${config.appRepoPath} ${livePath}`);
   } else {
-    await execAsync('git pull origin main', { cwd: livePath }).catch(() => {
-      console.log('[live] git pull failed, continuing with existing state');
-    });
+    await execAsync('git pull origin main', { cwd: livePath });
   }
 
   const adapter = await installAndBuild(livePath);

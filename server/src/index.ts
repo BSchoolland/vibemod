@@ -42,8 +42,12 @@ const wss = new WebSocketServer({ server, path: '/ws/chat' });
 setChatWss(wss);
 registerShutdown(server, wss);
 
-bootstrapAppRepo(config.seedPath).then(() => {
-  server.listen(config.port, () => {
-    console.log(`Vibemod server running on port ${config.port}`);
+bootstrapAppRepo(config.seedPath)
+  .catch((err) => {
+    console.error('[bootstrap] Failed to bootstrap app repo:', err.message);
+  })
+  .then(() => {
+    server.listen(config.port, () => {
+      console.log(`Vibemod server running on port ${config.port}`);
+    });
   });
-});
