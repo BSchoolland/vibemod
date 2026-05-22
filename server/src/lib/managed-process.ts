@@ -21,7 +21,7 @@ export class ManagedProcess {
   }
 
   async start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): Promise<void> {
-    await this.stopGraceful(3000);
+    this.stop();
     this.killPortHolder();
     await this.waitForPortFree();
 
