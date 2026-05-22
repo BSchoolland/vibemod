@@ -19,13 +19,3 @@ export interface WorktreeInfo {
   path: string;
   branch: string;
 }
-
-export type WsMessageIn =
-  | { type: 'chat'; content: string };
-
-export type WsMessageOut =
-  | { type: 'status'; content: string }
-  | { type: 'ai-stream'; content: string }
-  | { type: 'ai-done'; content: string; exitCode: number }
-  | { type: 'error'; content: string }
-  | { type: 'preview-reload' };

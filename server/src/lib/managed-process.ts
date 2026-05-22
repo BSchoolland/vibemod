@@ -23,6 +23,7 @@ export class ManagedProcess {
   async start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): Promise<void> {
     this.stop();
     this.killPortHolder();
+    await this.waitForPortFree();
 
     if (adapter.startFile) {
       await this.startStatic(appDir, adapter.startFile);
@@ -49,9 +50,12 @@ export class ManagedProcess {
       console.error(`[${this.label}] ${chunk.toString().trim()}`);
     });
 
-    this.process.on('close', (code) => {
+    const spawned = this.process;
+    spawned.on('close', (code) => {
       console.log(`[${this.label}] process exited with code ${code}`);
-      this.process = null;
+      if (this.process === spawned) {
+        this.process = null;
+      }
     });
 
     console.log(`[${this.label}] Server starting on port ${this.port} (pid ${this.process.pid})`);
@@ -143,6 +147,28 @@ export class ManagedProcess {
         console.log(`[${this.label}] Static server on port ${this.port}`);
         resolve();
       });
+    });
+  }
+
+  private waitForPortFree(timeoutMs = 5000, intervalMs = 100): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const check = () => {
+        const sock = createConnection({ port: this.port, host: '127.0.0.1' });
+        sock.once('connect', () => {
+          sock.destroy();
+          if (Date.now() >= deadline) {
+            reject(new Error(`[${this.label}] Port ${this.port} still in use after ${timeoutMs}ms`));
+          } else {
+            setTimeout(check, intervalMs);
+          }
+        });
+        sock.once('error', () => {
+          sock.destroy();
+          resolve();
+        });
+      };
+      check();
     });
   }
 

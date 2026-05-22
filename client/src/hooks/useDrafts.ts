@@ -1,14 +1,36 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export interface Draft {
+  id: number;
   name: string;
   branch: string;
   path: string;
+  adapter_id: string | null;
+  adapter_json: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useDrafts() {
   const [activeDraft, setActiveDraft] = useState<Draft | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchActive = useCallback(async () => {
+    try {
+      const res = await fetch('/api/drafts');
+      const data = await res.json();
+      setActiveDraft(data.active ?? null);
+    } catch {
+      // server not ready yet
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActive();
+  }, [fetchActive]);
 
   const createDraft = useCallback(async (name?: string) => {
     setIsLoading(true);
@@ -61,5 +83,5 @@ export function useDrafts() {
     }
   }, [activeDraft]);
 
-  return { activeDraft, isLoading, createDraft, deleteDraft, rebuild, publish };
+  return { activeDraft, isLoading, createDraft, deleteDraft, rebuild, publish, refetch: fetchActive };
 }

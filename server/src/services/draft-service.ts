@@ -1,0 +1,112 @@
+import path from 'path';
+import fs from 'fs/promises';
+import { db } from '../lib/db.js';
+import { config } from '../config.js';
+import { createWorktree, removeWorktree, listWorktrees } from '../lib/git.js';
+import { previewServer } from '../lib/servers.js';
+import { buildService } from './build-service.js';
+import type { AppAdapter } from '../types.js';
+
+export interface DraftRow {
+  id: number;
+  name: string;
+  branch: string;
+  path: string;
+  adapter_id: string | null;
+  adapter_json: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function adapterFromRow(row: DraftRow): AppAdapter | null {
+  if (!row.adapter_id || !row.adapter_json) return null;
+  return { id: row.adapter_id, ...JSON.parse(row.adapter_json) };
+}
+
+function adapterToDb(adapter: AppAdapter): { id: string; json: string } {
+  const { id, ...rest } = adapter;
+  return { id, json: JSON.stringify(rest) };
+}
+
+class DraftService {
+  list(): DraftRow[] {
+    return db.prepare('SELECT * FROM drafts ORDER BY created_at DESC').all() as DraftRow[];
+  }
+
+  getActive(): (DraftRow & { adapter: AppAdapter | null }) | null {
+    const row = db.prepare('SELECT * FROM drafts WHERE is_active = 1').get() as DraftRow | undefined;
+    if (!row) return null;
+    return { ...row, adapter: adapterFromRow(row) };
+  }
+
+  getByName(name: string): DraftRow | undefined {
+    return db.prepare('SELECT * FROM drafts WHERE name = ?').get(name) as DraftRow | undefined;
+  }
+
+  async create(name?: string): Promise<DraftRow & { adapter: AppAdapter }> {
+    const draftName = name || `draft-${Date.now()}`;
+    const branchName = `draft/${draftName}`;
+    const worktreePath = path.join(config.appRepoPath, '..', 'worktrees', draftName);
+
+    await fs.mkdir(path.dirname(worktreePath), { recursive: true });
+    await createWorktree(config.appRepoPath, branchName, worktreePath);
+
+    const adapter = await buildService.installAndBuild(worktreePath);
+    const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
+
+    db.prepare('UPDATE drafts SET is_active = 0 WHERE is_active = 1').run();
+
+    const result = db.prepare(
+      'INSERT INTO drafts (name, branch, path, adapter_id, adapter_json, is_active) VALUES (?, ?, ?, ?, ?, 1)'
+    ).run(draftName, branchName, worktreePath, adapterId, adapterJson);
+
+    await previewServer.start(worktreePath, adapter);
+
+    const row = db.prepare('SELECT * FROM drafts WHERE id = ?').get(result.lastInsertRowid) as DraftRow;
+    return { ...row, adapter };
+  }
+
+  async delete(name: string): Promise<void> {
+    const row = this.getByName(name);
+    if (!row) throw new Error(`Draft "${name}" not found`);
+
+    if (row.is_active) {
+      previewServer.stop();
+    }
+
+    const worktreePath = path.join(config.appRepoPath, '..', 'worktrees', name);
+    await removeWorktree(config.appRepoPath, worktreePath);
+    db.prepare('DELETE FROM drafts WHERE id = ?').run(row.id);
+  }
+
+  async rebuild(name: string): Promise<AppAdapter> {
+    const row = this.getByName(name);
+    if (!row) throw new Error(`Draft "${name}" not found`);
+
+    const adapter = await buildService.installAndBuild(row.path, undefined, row.id);
+    const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
+
+    db.prepare('UPDATE drafts SET adapter_id = ?, adapter_json = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(adapterId, adapterJson, row.id);
+
+    if (row.is_active) {
+      previewServer.stop();
+      await previewServer.start(row.path, adapter);
+    }
+
+    return adapter;
+  }
+
+  async restoreActive(): Promise<void> {
+    const active = this.getActive();
+    if (!active?.adapter) return;
+
+    if (!previewServer.running) {
+      console.log(`[draft-service] Restoring preview for "${active.name}"`);
+      await previewServer.start(active.path, active.adapter);
+    }
+  }
+}
+
+export const draftService = new DraftService();

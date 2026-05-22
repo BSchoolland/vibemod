@@ -34,8 +34,23 @@ export async function listWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
   return worktrees;
 }
 
+export async function getDefaultBranch(repoPath: string): Promise<string> {
+  const { stdout } = await git(['rev-parse', '--verify', '--quiet', 'main'], repoPath).catch(() => ({ stdout: '' }));
+  return stdout.trim() ? 'main' : 'master';
+}
+
+export async function commitAll(worktreePath: string, message: string): Promise<boolean> {
+  const { stdout } = await git(['status', '--porcelain'], worktreePath);
+  if (!stdout.trim()) return false;
+
+  await git(['add', '-A'], worktreePath);
+  await git(['commit', '-m', message], worktreePath);
+  return true;
+}
+
 export async function mergeBranch(repoPath: string, branchName: string): Promise<void> {
-  await git(['checkout', 'main'], repoPath);
+  const defaultBranch = await getDefaultBranch(repoPath);
+  await git(['checkout', defaultBranch], repoPath);
   await git(['merge', branchName, '--no-ff', '-m', `Publish: merge ${branchName}`], repoPath);
 }
 
