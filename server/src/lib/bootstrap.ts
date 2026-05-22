@@ -1,14 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { config } from '../config.js';
-import { installAndBuild } from './deploy.js';
-import { liveServer } from './servers.js';
+import { draftService } from '../services/draft-service.js';
 import { createLogger } from './logger.js';
 
 const execFileAsync = promisify(execFile);
-const execAsync = promisify(exec);
 const log = createLogger('bootstrap');
 
 export async function bootstrapAppRepo(seedPath: string): Promise<void> {
@@ -37,22 +35,11 @@ export async function bootstrapAppRepo(seedPath: string): Promise<void> {
     log.info({ repoPath }, 'app repo already exists');
   }
 
-  await deployLive();
-}
-
-export async function deployLive(): Promise<void> {
-  const livePath = config.liveClonePath;
-
-  const exists = await fs.access(path.join(livePath, '.git')).then(() => true).catch(() => false);
-  if (!exists) {
-    log.info({ livePath }, 'cloning app repo for live server');
-    await execAsync(`git clone ${config.appRepoPath} ${livePath}`);
-  } else {
-    await execAsync('git pull', { cwd: livePath }).catch(() => {
-      log.warn({ livePath }, 'git pull failed, continuing with existing state');
-    });
+  const live = draftService.getLive();
+  if (!live) {
+    log.info('no live version found, creating initial version');
+    const initial = await draftService.create('initial');
+    await draftService.publish('initial');
+    log.info({ name: initial.name }, 'initial version published');
   }
-
-  const adapter = await installAndBuild(livePath);
-  await liveServer.start(livePath, adapter);
 }

@@ -18,6 +18,14 @@ draftsRouter.post('/', route(async (req, res) => {
   res.json({ draft });
 }));
 
+draftsRouter.post('/:name/activate', route(async (req, res) => {
+  const name = req.params.name as string;
+  annotate({ draftName: name });
+  const draft = await draftService.activate(name);
+  annotate({ draftId: draft.id });
+  res.json({ draft });
+}));
+
 draftsRouter.delete('/:name', route(async (req, res) => {
   const name = req.params.name as string;
   annotate({ draftName: name });

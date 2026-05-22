@@ -48,7 +48,7 @@ app.use(errorHandler);
 registerShutdown(server);
 
 bootstrapAppRepo(config.seedPath).then(async () => {
-  await draftService.restoreActive();
+  await draftService.restoreServers();
   server.listen(config.port, () => {
     log.info({ port: config.port }, 'server started');
   });

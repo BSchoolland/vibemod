@@ -6,7 +6,7 @@ import { useDrafts } from '@/hooks/useDrafts';
 const PREVIEW_PORT = 3002;
 
 function App() {
-  const { activeDraft, isLoading, createDraft, publish, rebuild, refetch } = useDrafts();
+  const { drafts, activeDraft, isLoading, createDraft, activate, publish, rebuild, refetch } = useDrafts();
   const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null);
 
   const handleRebuild = async () => {
@@ -20,9 +20,11 @@ function App() {
         messages={messages}
         onSend={async (msg) => { await sendMessage(msg); await refetch(); }}
         isSending={isSending}
+        drafts={drafts}
         activeDraft={activeDraft}
         isLoading={isLoading}
         onCreateDraft={() => createDraft()}
+        onActivate={(name) => activate(name)}
         onPublish={() => publish()}
         onRebuild={handleRebuild}
       />

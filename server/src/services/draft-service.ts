@@ -2,8 +2,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { db } from '../lib/db.js';
 import { config } from '../config.js';
-import { createWorktree, removeWorktree, listWorktrees } from '../lib/git.js';
-import { previewServer } from '../lib/servers.js';
+import { createWorktree, removeWorktree, commitAll } from '../lib/git.js';
+import { previewServer, liveServer } from '../lib/servers.js';
 import { buildService } from './build-service.js';
 import { createLogger } from '../lib/logger.js';
 import { annotate, time } from '../lib/request-context.js';
@@ -19,6 +19,7 @@ export interface DraftRow {
   adapter_id: string | null;
   adapter_json: string | null;
   is_active: number;
+  status: 'inactive' | 'live';
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +45,12 @@ class DraftService {
     return { ...row, adapter: adapterFromRow(row) };
   }
 
+  getLive(): (DraftRow & { adapter: AppAdapter | null }) | null {
+    const row = db.prepare("SELECT * FROM drafts WHERE status = 'live'").get() as DraftRow | undefined;
+    if (!row) return null;
+    return { ...row, adapter: adapterFromRow(row) };
+  }
+
   getByName(name: string): DraftRow | undefined {
     return db.prepare('SELECT * FROM drafts WHERE name = ?').get(name) as DraftRow | undefined;
   }
@@ -55,8 +62,11 @@ class DraftService {
 
     annotate({ draftName, branchName });
 
+    const liveVersion = this.getLive();
+    const startPoint = liveVersion?.branch;
+
     await fs.mkdir(path.dirname(worktreePath), { recursive: true });
-    await time('worktree', () => createWorktree(config.appRepoPath, branchName, worktreePath));
+    await time('worktree', () => createWorktree(config.appRepoPath, branchName, worktreePath, startPoint));
 
     const adapter = await time('build', () => buildService.installAndBuild(worktreePath));
     annotate({ adapterId: adapter.id, adapterName: adapter.name });
@@ -64,18 +74,58 @@ class DraftService {
     db.prepare('UPDATE drafts SET is_active = 0 WHERE is_active = 1').run();
 
     const result = db.prepare(
-      'INSERT INTO drafts (name, branch, path, adapter_id, adapter_json, is_active) VALUES (?, ?, ?, ?, ?, 1)'
+      "INSERT INTO drafts (name, branch, path, adapter_id, adapter_json, is_active, status) VALUES (?, ?, ?, ?, ?, 1, 'inactive')"
     ).run(draftName, branchName, worktreePath, ...Object.values(adapterToDb(adapter)));
 
+    previewServer.stop();
     await previewServer.start(worktreePath, adapter);
 
     const row = db.prepare('SELECT * FROM drafts WHERE id = ?').get(result.lastInsertRowid) as DraftRow;
     return { ...row, adapter };
   }
 
+  async activate(name: string): Promise<DraftRow & { adapter: AppAdapter | null }> {
+    const row = this.getByName(name);
+    if (!row) throw new Error(`Draft "${name}" not found`);
+
+    db.prepare('UPDATE drafts SET is_active = 0 WHERE is_active = 1').run();
+    db.prepare("UPDATE drafts SET is_active = 1, updated_at = datetime('now') WHERE id = ?").run(row.id);
+
+    previewServer.stop();
+    const adapter = adapterFromRow(row);
+    if (adapter) {
+      await previewServer.start(row.path, adapter);
+    }
+
+    return { ...row, is_active: 1, adapter };
+  }
+
+  async publish(name: string): Promise<void> {
+    const row = this.getByName(name);
+    if (!row) throw new Error(`Draft "${name}" not found`);
+
+    annotate({ draftName: row.name, draftBranch: row.branch });
+
+    await time('commit', () => commitAll(row.path, `Publish ${row.name}`));
+
+    const adapter = await time('build', () => buildService.installAndBuild(row.path, undefined, row.id));
+    const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
+
+    db.prepare("UPDATE drafts SET status = 'inactive' WHERE status = 'live'").run();
+    db.prepare(
+      "UPDATE drafts SET status = 'live', adapter_id = ?, adapter_json = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(adapterId, adapterJson, row.id);
+
+    liveServer.stop();
+    await liveServer.start(row.path, adapter);
+
+    log.info({ draftName: row.name }, 'published to live');
+  }
+
   async delete(name: string): Promise<void> {
     const row = this.getByName(name);
     if (!row) throw new Error(`Draft "${name}" not found`);
+    if (row.status === 'live') throw new Error('Cannot delete the live version');
 
     if (row.is_active) {
       previewServer.stop();
@@ -93,7 +143,7 @@ class DraftService {
     const adapter = await buildService.installAndBuild(row.path, undefined, row.id);
     const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
 
-    db.prepare('UPDATE drafts SET adapter_id = ?, adapter_json = ?, updated_at = datetime(\'now\') WHERE id = ?')
+    db.prepare("UPDATE drafts SET adapter_id = ?, adapter_json = ?, updated_at = datetime('now') WHERE id = ?")
       .run(adapterId, adapterJson, row.id);
 
     if (row.is_active) {
@@ -101,15 +151,24 @@ class DraftService {
       await previewServer.start(row.path, adapter);
     }
 
+    if (row.status === 'live') {
+      liveServer.stop();
+      await liveServer.start(row.path, adapter);
+    }
+
     return adapter;
   }
 
-  async restoreActive(): Promise<void> {
-    const active = this.getActive();
-    if (!active?.adapter) return;
+  async restoreServers(): Promise<void> {
+    const live = this.getLive();
+    if (live?.adapter && !liveServer.running) {
+      log.info({ draftName: live.name }, 'restoring live server');
+      await liveServer.start(live.path, live.adapter);
+    }
 
-    if (!previewServer.running) {
-      log.info({ draftName: active.name }, 'restoring preview');
+    const active = this.getActive();
+    if (active?.adapter && !previewServer.running) {
+      log.info({ draftName: active.name }, 'restoring preview server');
       await previewServer.start(active.path, active.adapter);
     }
   }

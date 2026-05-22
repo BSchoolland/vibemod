@@ -10,20 +10,79 @@ interface ChatSidebarProps {
   messages: ChatMessage[];
   onSend: (content: string) => void;
   isSending: boolean;
+  drafts: Draft[];
   activeDraft: Draft | null;
   isLoading: boolean;
   onCreateDraft: () => void;
+  onActivate: (name: string) => void;
   onPublish: () => void;
   onRebuild: () => void;
+}
+
+function StatusBadge({ status }: { status: Draft['status'] }) {
+  if (status === 'live') {
+    return <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">live</span>;
+  }
+  return null;
+}
+
+function VersionList({
+  drafts,
+  activeDraft,
+  isLoading,
+  onActivate,
+  onCreateDraft,
+}: {
+  drafts: Draft[];
+  activeDraft: Draft | null;
+  isLoading: boolean;
+  onActivate: (name: string) => void;
+  onCreateDraft: () => void;
+}) {
+  return (
+    <div className="p-3 border-b border-border">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Versions</span>
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={onCreateDraft} disabled={isLoading}>
+          + New
+        </Button>
+      </div>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {drafts.length === 0 && (
+          <p className="text-xs text-muted-foreground py-2">No versions yet</p>
+        )}
+        {drafts.map((draft) => {
+          const isActive = activeDraft?.id === draft.id;
+          return (
+            <button
+              key={draft.id}
+              onClick={() => !isActive && onActivate(draft.name)}
+              disabled={isLoading || isActive}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
+                isActive
+                  ? 'bg-accent text-accent-foreground'
+                  : 'hover:bg-muted/50 text-foreground'
+              }`}
+            >
+              <span className="flex-1 truncate font-mono text-xs">{draft.name}</span>
+              <StatusBadge status={draft.status} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function ChatSidebar({
   messages,
   onSend,
   isSending,
+  drafts,
   activeDraft,
   isLoading,
   onCreateDraft,
+  onActivate,
   onPublish,
   onRebuild,
 }: ChatSidebarProps) {
@@ -49,34 +108,32 @@ export function ChatSidebar({
         <h1 className="text-lg font-semibold">vibemod</h1>
       </div>
 
-      <div className="p-3 border-b border-border space-y-2">
-        {activeDraft ? (
-          <>
-            <div className="text-sm">
-              <span className="text-muted-foreground">Draft: </span>
-              <span className="font-mono text-xs">{activeDraft.branch}</span>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={onRebuild} disabled={isLoading}>
-                Rebuild
-              </Button>
-              <Button size="sm" onClick={onPublish} disabled={isLoading}>
-                Publish
-              </Button>
-            </div>
-          </>
-        ) : (
-          <Button size="sm" onClick={onCreateDraft} disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'New Draft'}
+      <VersionList
+        drafts={drafts}
+        activeDraft={activeDraft}
+        isLoading={isLoading}
+        onActivate={onActivate}
+        onCreateDraft={onCreateDraft}
+      />
+
+      {activeDraft && (
+        <div className="px-3 py-2 border-b border-border flex gap-2">
+          <Button size="sm" variant="outline" onClick={onRebuild} disabled={isLoading}>
+            Rebuild
           </Button>
-        )}
-      </div>
+          <Button size="sm" onClick={onPublish} disabled={isLoading}>
+            Publish
+          </Button>
+        </div>
+      )}
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.length === 0 && (
             <p className="text-sm text-muted-foreground text-center mt-8">
-              Create a draft and start describing changes.
+              {activeDraft
+                ? 'Start describing changes.'
+                : 'Select or create a version to start.'}
             </p>
           )}
           {messages.map((msg) => (
@@ -108,7 +165,7 @@ export function ChatSidebar({
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={activeDraft ? 'Describe a change...' : 'Create a draft first'}
+          placeholder={activeDraft ? 'Describe a change...' : 'Select a version first'}
           disabled={!activeDraft || isSending}
         />
         <Button type="submit" disabled={!activeDraft || isSending || !input.trim()}>

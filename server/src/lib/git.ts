@@ -8,8 +8,10 @@ function git(args: string[], cwd: string) {
   return execFileAsync('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 });
 }
 
-export async function createWorktree(repoPath: string, branchName: string, worktreePath: string): Promise<string> {
-  await git(['worktree', 'add', '-b', branchName, worktreePath], repoPath);
+export async function createWorktree(repoPath: string, branchName: string, worktreePath: string, startPoint?: string): Promise<string> {
+  const args = ['worktree', 'add', '-b', branchName, worktreePath];
+  if (startPoint) args.push(startPoint);
+  await git(args, repoPath);
   return worktreePath;
 }
 
@@ -48,12 +50,6 @@ export async function commitAll(worktreePath: string, message: string): Promise<
   return true;
 }
 
-export async function mergeBranch(repoPath: string, branchName: string): Promise<void> {
-  const defaultBranch = await getDefaultBranch(repoPath);
-  await git(['checkout', defaultBranch], repoPath);
-  await git(['merge', branchName, '--no-ff', '-m', `Publish: merge ${branchName}`], repoPath);
-}
-
-export async function deleteBranch(repoPath: string, branchName: string): Promise<void> {
-  await git(['branch', '-D', branchName], repoPath);
+export async function pruneWorktrees(repoPath: string): Promise<void> {
+  await git(['worktree', 'prune'], repoPath);
 }
