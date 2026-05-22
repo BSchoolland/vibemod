@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createLogger } from '../lib/logger.js';
+import { draftEvents } from '../lib/draft-events.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(__dirname, '..', '..', 'screenshots');
@@ -13,6 +14,14 @@ const log = createLogger('screenshot');
 
 class ScreenshotService {
   private browser: Browser | null = null;
+
+  listen(): void {
+    draftEvents.on('preview-started', (draftId, port) => {
+      this.capture(draftId, port).catch((err) => {
+        log.error({ draftId, err }, 'screenshot capture failed');
+      });
+    });
+  }
 
   private async ensureDir(): Promise<void> {
     await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
@@ -32,13 +41,6 @@ class ScreenshotService {
     });
 
     return this.browser;
-  }
-
-  captureWhenReady(draftId: number, port: number): void {
-    this.capture(draftId, port).catch((err) => {
-      log.error({ draftId, err }, 'screenshot capture failed');
-    });
-    log.info({ draftId }, 'screenshot capture started');
   }
 
   private async capture(draftId: number, port: number): Promise<void> {

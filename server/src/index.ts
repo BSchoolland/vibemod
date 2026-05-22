@@ -11,8 +11,11 @@ import { draftService } from './services/draft-service.js';
 import { config } from './config.js';
 import { createLogger } from './lib/logger.js';
 import { requestLogger, errorHandler } from './lib/request-context.js';
+import { screenshotService } from './services/screenshot-service.js';
 
 const log = createLogger('startup');
+
+screenshotService.listen();
 
 function killPort(port: number): void {
   try {
