@@ -1,8 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Send, Sparkles } from 'lucide-react';
 import type { ChatMessage } from '@/hooks/useChat';
 import type { Draft } from '@/hooks/useDrafts';
 
@@ -10,80 +7,52 @@ interface ChatSidebarProps {
   messages: ChatMessage[];
   onSend: (content: string) => void;
   isSending: boolean;
-  drafts: Draft[];
   activeDraft: Draft | null;
-  isLoading: boolean;
-  onCreateDraft: () => void;
-  onActivate: (name: string) => void;
-  onRebuild: () => void;
 }
 
-function StatusBadge({ status }: { status: Draft['status'] }) {
-  if (status === 'live') {
-    return <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">live</span>;
-  }
-  return null;
-}
-
-function VersionList({
-  drafts,
-  activeDraft,
-  isLoading,
-  onActivate,
-  onCreateDraft,
-}: {
-  drafts: Draft[];
-  activeDraft: Draft | null;
-  isLoading: boolean;
-  onActivate: (name: string) => void;
-  onCreateDraft: () => void;
-}) {
+function ThinkingIndicator() {
   return (
-    <div className="p-3 border-b border-border">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Versions</span>
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={onCreateDraft} disabled={isLoading}>
-          + New
-        </Button>
-      </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {drafts.length === 0 && (
-          <p className="text-xs text-muted-foreground py-2">No versions yet</p>
-        )}
-        {drafts.map((draft) => {
-          const isActive = activeDraft?.id === draft.id;
-          return (
-            <button
-              key={draft.id}
-              onClick={() => !isActive && onActivate(draft.name)}
-              disabled={isLoading || isActive}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 transition-colors ${
-                isActive
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-muted/50 text-foreground'
-              }`}
-            >
-              <span className="flex-1 truncate font-mono text-xs">{draft.name}</span>
-              <StatusBadge status={draft.status} />
-            </button>
-          );
-        })}
+    <div className="flex justify-start">
+      <div className="rounded-2xl rounded-bl-md px-5 py-3.5 bg-secondary">
+        <div className="flex gap-1.5">
+          <span className="thinking-dot w-2.5 h-2.5 rounded-full bg-neon-pink inline-block" />
+          <span className="thinking-dot w-2.5 h-2.5 rounded-full bg-neon-magenta inline-block" />
+          <span className="thinking-dot w-2.5 h-2.5 rounded-full bg-neon-cyan inline-block" />
+        </div>
       </div>
     </div>
   );
 }
 
-export function ChatSidebar({
-  messages,
-  onSend,
-  isSending,
-  drafts,
-  activeDraft,
-  isLoading,
-  onCreateDraft,
-  onActivate,
-  onRebuild,
-}: ChatSidebarProps) {
+function MessageBubble({ message }: { message: ChatMessage }) {
+  if (message.role === 'system') {
+    return (
+      <div className="flex justify-center">
+        <div className="px-3 py-1.5 rounded-full bg-neon-yellow/10 text-xs text-neon-yellow font-medium border border-neon-yellow/20">
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+
+  const isUser = message.role === 'user';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[85%] px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+          isUser
+            ? 'rounded-2xl rounded-br-md bg-gradient-primary text-white'
+            : 'rounded-2xl rounded-bl-md bg-secondary text-secondary-foreground border border-border/50'
+        }`}
+      >
+        {message.content}
+      </div>
+    </div>
+  );
+}
+
+export function ChatSidebar({ messages, onSend, isSending, activeDraft }: ChatSidebarProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +60,7 @@ export function ChatSidebar({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isSending]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,68 +70,50 @@ export function ChatSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full w-[400px] border-r border-border bg-card">
-
-      <VersionList
-        drafts={drafts}
-        activeDraft={activeDraft}
-        isLoading={isLoading}
-        onActivate={onActivate}
-        onCreateDraft={onCreateDraft}
-      />
-
-      {activeDraft && (
-        <div className="px-3 py-2 border-b border-border">
-          <Button size="sm" variant="outline" onClick={onRebuild} disabled={isLoading}>
-            Rebuild
-          </Button>
-        </div>
-      )}
-
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
-          {messages.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center mt-8">
-              {activeDraft
-                ? 'Start describing changes.'
-                : 'Select or create a version to start.'}
-            </p>
-          )}
-          {messages.map((msg) => (
-            <div key={msg.id}>
-              <div
-                className={`text-sm ${
-                  msg.role === 'user'
-                    ? 'text-foreground'
-                    : msg.role === 'system'
-                      ? 'text-destructive'
-                      : 'text-muted-foreground'
-                }`}
-              >
-                <span className="font-semibold">
-                  {msg.role === 'user' ? 'You' : msg.role === 'ai' ? 'AI' : 'System'}:{' '}
-                </span>
-                <span className="whitespace-pre-wrap">{msg.content}</span>
-              </div>
-              <Separator className="mt-4" />
+    <div className="flex flex-col w-[420px] shrink-0 bg-card rounded-2xl border border-border/50 overflow-hidden card-neon">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-3" ref={scrollRef}>
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center gap-4 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center glow-pink">
+              <Sparkles className="w-8 h-8 text-white" />
             </div>
-          ))}
-          {isSending && (
-            <p className="text-sm text-muted-foreground animate-pulse">AI is thinking...</p>
-          )}
-        </div>
-      </ScrollArea>
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                {activeDraft ? 'What feature are you missing?' : 'No draft selected'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                {activeDraft
+                  ? 'Describe the feature you always wanted and watch it appear.'
+                  : 'Pick a draft from the menu above to get started.'}
+              </p>
+            </div>
+          </div>
+        )}
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+        {isSending && <ThinkingIndicator />}
+      </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t border-border flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={activeDraft ? 'Describe a change...' : 'Select a version first'}
-          disabled={!activeDraft || isSending}
-        />
-        <Button type="submit" disabled={!activeDraft || isSending || !input.trim()}>
-          Send
-        </Button>
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="p-3 border-t border-border/50">
+        <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-1 border border-border/30">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={activeDraft ? 'Describe what you want...' : 'Select a draft first'}
+            disabled={!activeDraft || isSending}
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground py-2 text-foreground"
+          />
+          <button
+            type="submit"
+            disabled={!activeDraft || isSending || !input.trim()}
+            className="w-9 h-9 rounded-xl bg-gradient-send text-white flex items-center justify-center disabled:opacity-20 hover:opacity-90 transition-all shrink-0 cursor-pointer disabled:cursor-default glow-send disabled:shadow-none"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
       </form>
     </div>
   );

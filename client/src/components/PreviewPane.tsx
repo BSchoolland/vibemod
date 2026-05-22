@@ -1,3 +1,4 @@
+import { Globe } from 'lucide-react';
 import type { Draft } from '@/hooks/useDrafts';
 
 interface PreviewPaneProps {
@@ -8,10 +9,13 @@ interface PreviewPaneProps {
 export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
   if (!activeDraft) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-muted/30">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg">No active draft</p>
-          <p className="text-sm mt-1">Create a draft to start previewing changes</p>
+      <div className="flex-1 rounded-2xl bg-card border border-border/50 flex items-center justify-center card-neon">
+        <div className="text-center">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-neon-pink/10 via-neon-magenta/10 to-neon-cyan/10 flex items-center justify-center mx-auto mb-5 border border-neon-pink/10">
+            <Globe className="w-10 h-10 text-neon-pink/40" />
+          </div>
+          <p className="text-lg font-semibold text-foreground">Your app preview shows up here</p>
+          <p className="text-sm mt-1.5 text-muted-foreground">Add that feature you always wanted to the tool you use every day</p>
         </div>
       </div>
     );
@@ -20,10 +24,21 @@ export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
   const previewUrl = `${window.location.protocol}//${window.location.hostname}:${previewPort}`;
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="h-10 border-b border-border flex items-center px-4 bg-muted/30">
-        <span className="text-xs text-muted-foreground font-mono">{previewUrl}</span>
+    <div className="flex-1 rounded-2xl bg-card border border-border/50 flex flex-col overflow-hidden card-neon">
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary/50 border-b border-border/50">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-neon-red" />
+          <span className="w-3 h-3 rounded-full bg-neon-yellow" />
+          <span className="w-3 h-3 rounded-full bg-neon-green" />
+        </div>
+        <div className="flex-1 flex justify-center">
+          <div className="bg-muted rounded-lg border border-border/50 px-4 py-1 text-xs text-muted-foreground font-mono max-w-sm w-full text-center select-all">
+            {previewUrl}
+          </div>
+        </div>
+        <div className="w-[54px]" />
       </div>
+
       <iframe
         key={activeDraft.updated_at}
         src={previewUrl}

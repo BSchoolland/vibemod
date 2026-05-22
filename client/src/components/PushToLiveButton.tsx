@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { Rocket, Check, ExternalLink } from 'lucide-react';
 import type { PublishState, PublishStage } from '@/hooks/usePublish';
 
 interface PushToLiveButtonProps {
@@ -11,13 +11,17 @@ interface PushToLiveButtonProps {
   onReset: () => void;
 }
 
-const PIPELINE: Array<Exclude<PublishStage, 'idle' | 'done' | 'error'>> = ['committing', 'building', 'starting'];
+const PIPELINE: Array<Exclude<PublishStage, 'idle' | 'done' | 'error'>> = [
+  'committing',
+  'building',
+  'starting',
+];
 
 const STAGE_LABELS: Record<string, string> = {
   committing: 'Committing changes',
-  building: 'Building',
+  building: 'Building app',
   starting: 'Starting server',
-  done: 'Live!',
+  done: 'Deployed!',
 };
 
 function stageState(
@@ -36,7 +40,7 @@ function stageState(
 function Spinner({ className = '' }: { className?: string }) {
   return (
     <svg
-      className={`animate-spin h-3 w-3 ${className}`}
+      className={`animate-spin h-3.5 w-3.5 ${className}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -50,30 +54,42 @@ function Spinner({ className = '' }: { className?: string }) {
 function StageRow({ label, state }: { label: string; state: 'pending' | 'active' | 'done' }) {
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-300 ${
-        state === 'active' ? 'bg-primary/10 border border-primary/20' : ''
-      } ${state === 'done' ? 'opacity-50' : ''} ${state === 'pending' ? 'opacity-30' : ''}`}
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 ${
+        state === 'active' ? 'bg-neon-pink/10' : ''
+      }`}
     >
-      <span className="text-xs w-3 text-center">
-        {state === 'done' ? '✓' : '○'}
+      <span className="w-4 h-4 flex items-center justify-center shrink-0">
+        {state === 'done' ? (
+          <Check className="w-3.5 h-3.5 text-neon-green" />
+        ) : state === 'active' ? (
+          <Spinner className="text-neon-pink" />
+        ) : (
+          <span className="w-2 h-2 rounded-full bg-border" />
+        )}
       </span>
       <span
         className={`text-xs transition-all duration-200 ${
-          state === 'active' ? 'text-foreground font-medium' : 'text-muted-foreground'
-        } ${state === 'done' ? 'line-through' : ''}`}
+          state === 'active'
+            ? 'text-foreground font-medium'
+            : state === 'done'
+              ? 'text-muted-foreground'
+              : 'text-muted-foreground/50'
+        }`}
       >
         {label}
       </span>
-      {state === 'active' && (
-        <span className="ml-auto">
-          <Spinner className="text-primary" />
-        </span>
-      )}
     </div>
   );
 }
 
-export function PushToLiveButton({ draftName, isLive, livePort, state, onPublish, onReset }: PushToLiveButtonProps) {
+export function PushToLiveButton({
+  draftName,
+  isLive,
+  livePort,
+  state,
+  onPublish,
+  onReset,
+}: PushToLiveButtonProps) {
   const { stage, error } = state;
   const panelVisible = stage !== 'idle';
   const isRunning = stage !== 'idle' && stage !== 'done' && stage !== 'error';
@@ -81,7 +97,7 @@ export function PushToLiveButton({ draftName, isLive, livePort, state, onPublish
 
   useEffect(() => {
     if (stage === 'done') {
-      timerRef.current = setTimeout(onReset, 2000);
+      timerRef.current = setTimeout(onReset, 2500);
     }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -96,9 +112,10 @@ export function PushToLiveButton({ draftName, isLive, livePort, state, onPublish
         href={liveUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center h-7 px-3 text-xs font-semibold rounded-md bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+        className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-xl bg-gradient-live text-black hover:opacity-90 transition-all glow-cyan"
       >
-        Live!
+        <ExternalLink className="w-3.5 h-3.5" />
+        View Live
       </a>
     );
   }
@@ -114,48 +131,53 @@ export function PushToLiveButton({ draftName, isLive, livePort, state, onPublish
 
   return (
     <div className="relative">
-      <Button
-        size="sm"
+      <button
         onClick={handleClick}
         disabled={!draftName || isRunning}
-        className="h-7 px-3 text-xs font-semibold"
+        className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-xl bg-gradient-primary text-white hover:opacity-90 disabled:opacity-30 transition-all cursor-pointer disabled:cursor-default glow-pink disabled:shadow-none"
       >
         {isRunning ? (
-          <span className="flex items-center gap-1.5">
-            <Spinner />
+          <>
+            <Spinner className="text-white" />
             Deploying...
-          </span>
+          </>
         ) : (
-          'Push to Live'
+          <>
+            <Rocket className="w-3.5 h-3.5" />
+            Go Live
+          </>
         )}
-      </Button>
+      </button>
 
       <div
-        className={`absolute right-0 top-9 z-50 w-52 rounded-lg border border-border bg-card shadow-xl transition-all duration-200 origin-top-right ${
+        className={`absolute right-0 top-11 z-50 w-56 rounded-xl border border-border/50 bg-card shadow-xl transition-all duration-200 origin-top-right ${
           panelVisible
             ? 'opacity-100 scale-100 translate-y-0'
             : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
         }`}
       >
-        <div className="p-3">
+        <div className="p-2">
           {stage === 'error' ? (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-destructive">Deploy failed</p>
-              {error && <p className="text-xs text-muted-foreground break-words">{error}</p>}
+            <div className="p-2 space-y-2">
+              <p className="text-xs font-semibold text-neon-red">Deploy failed</p>
+              {error && (
+                <p className="text-xs text-muted-foreground break-words">{error}</p>
+              )}
               <button
                 onClick={onReset}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-neon-pink font-medium hover:underline transition-colors"
               >
                 Dismiss
               </button>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {PIPELINE.map((s) => (
                 <StageRow key={s} label={STAGE_LABELS[s]} state={stageState(s, stage)} />
               ))}
               {stage === 'done' && (
-                <div className="px-2 py-1.5 text-xs font-medium text-green-400">
+                <div className="px-3 py-2 text-xs font-bold text-neon-green flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
                   {STAGE_LABELS.done}
                 </div>
               )}
