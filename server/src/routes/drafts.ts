@@ -36,7 +36,7 @@ draftsRouter.post('/', async (req: Request, res: Response) => {
 
     const adapter = await installAndBuild(worktreePath);
     activeDraft = { name, branch: branchName, path: worktreePath, adapter };
-    previewServer.start(worktreePath, adapter);
+    await previewServer.start(worktreePath, adapter);
 
     res.json({ draft: activeDraft });
   } catch (err: any) {
@@ -68,7 +68,7 @@ draftsRouter.post('/:name/rebuild', async (req: Request<{ name: string }>, res: 
 
     const adapter = await installAndBuild(worktreePath);
     previewServer.stop();
-    previewServer.start(worktreePath, adapter);
+    await previewServer.start(worktreePath, adapter);
 
     if (activeDraft?.name === name) {
       activeDraft.adapter = adapter;

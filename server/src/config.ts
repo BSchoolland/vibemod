@@ -11,5 +11,5 @@ export const config = {
   liveClonePath: process.env.LIVE_CLONE_PATH || path.join(__dirname, '..', '..', 'app-live'),
   seedPath: process.env.SEED_PATH || path.join(__dirname, '..', '..', 'seed-app'),
   aiCli: process.env.AI_CLI || 'claude',
-  aiCliArgs: process.env.AI_CLI_ARGS || '-p',
+  aiCliArgs: process.env.AI_CLI_ARGS || '-p --dangerously-skip-permissions --model haiku',
 };

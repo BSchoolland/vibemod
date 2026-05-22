@@ -1,13 +1,9 @@
 {
   "name": "vibemod",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "cd server && npm run dev",
-    "dev:client": "cd client && npm run dev",
+    "dev": "node start.js",
     "install:all": "cd server && npm install && cd ../client && npm install"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.0"
   }
 }

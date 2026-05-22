@@ -52,5 +52,5 @@ export async function deployLive(): Promise<void> {
   }
 
   const adapter = await installAndBuild(livePath);
-  liveServer.start(livePath, adapter);
+  await liveServer.start(livePath, adapter);
 }

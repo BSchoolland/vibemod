@@ -1,4 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
+import { createConnection } from 'net';
 import express from 'express';
 import { createServer, type Server } from 'http';
 import path from 'path';
@@ -19,12 +20,12 @@ export class ManagedProcess {
     this.port = port;
   }
 
-  start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): void {
+  async start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): Promise<void> {
     this.stop();
     this.killPortHolder();
 
     if (adapter.startFile) {
-      this.startStatic(appDir, adapter.startFile);
+      await this.startStatic(appDir, adapter.startFile);
       return;
     }
 
@@ -54,6 +55,7 @@ export class ManagedProcess {
     });
 
     console.log(`[${this.label}] Server starting on port ${this.port} (pid ${this.process.pid})`);
+    await this.waitForPort();
   }
 
   stop(): void {
@@ -129,15 +131,45 @@ export class ManagedProcess {
     } catch {}
   }
 
-  private startStatic(appDir: string, startFile: string): void {
-    const app = express();
-    app.use(express.static(appDir));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(appDir, startFile));
+  private startStatic(appDir: string, startFile: string): Promise<void> {
+    return new Promise((resolve) => {
+      const app = express();
+      app.use(express.static(appDir));
+      app.get('*', (_req, res) => {
+        res.sendFile(path.join(appDir, startFile));
+      });
+      this.staticServer = createServer(app);
+      this.staticServer.listen(this.port, () => {
+        console.log(`[${this.label}] Static server on port ${this.port}`);
+        resolve();
+      });
     });
-    this.staticServer = createServer(app);
-    this.staticServer.listen(this.port, () => {
-      console.log(`[${this.label}] Static server on port ${this.port}`);
+  }
+
+  private waitForPort(timeoutMs = 30000, intervalMs = 200): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const deadline = Date.now() + timeoutMs;
+      const check = () => {
+        if (!this.process) {
+          reject(new Error(`[${this.label}] Process exited before server became ready`));
+          return;
+        }
+        const sock = createConnection({ port: this.port, host: '127.0.0.1' });
+        sock.once('connect', () => {
+          sock.destroy();
+          console.log(`[${this.label}] Server ready on port ${this.port}`);
+          resolve();
+        });
+        sock.once('error', () => {
+          sock.destroy();
+          if (Date.now() >= deadline) {
+            reject(new Error(`[${this.label}] Timed out waiting for port ${this.port}`));
+          } else {
+            setTimeout(check, intervalMs);
+          }
+        });
+      };
+      check();
     });
   }
 }
