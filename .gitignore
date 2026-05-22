@@ -19,3 +19,5 @@ data.json
 *.sw?
 .idea/
 .vscode/
+.antigravitycli/
+*.tsbuildinfo
