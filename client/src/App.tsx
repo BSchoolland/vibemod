@@ -18,7 +18,7 @@ function App() {
     <div className="flex h-screen">
       <ChatSidebar
         messages={messages}
-        onSend={sendMessage}
+        onSend={async (msg) => { await sendMessage(msg); await refetch(); }}
         isSending={isSending}
         activeDraft={activeDraft}
         isLoading={isLoading}
