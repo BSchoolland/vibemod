@@ -1,7 +1,12 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { config } from '../config.js';
 
-export function runAiCli(prompt, cwd, onData, onDone) {
+export function runAiCli(
+  prompt: string,
+  cwd: string,
+  onData: (chunk: string) => void,
+  onDone: (code: number, fullOutput: string) => void,
+): ChildProcess {
   const args = config.aiCliArgs.split(' ').filter(Boolean);
   args.push(prompt);
 
@@ -13,20 +18,20 @@ export function runAiCli(prompt, cwd, onData, onDone) {
 
   let fullOutput = '';
 
-  proc.stdout.on('data', (chunk) => {
+  proc.stdout!.on('data', (chunk: Buffer) => {
     const text = chunk.toString();
     fullOutput += text;
     onData(text);
   });
 
-  proc.stderr.on('data', (chunk) => {
+  proc.stderr!.on('data', (chunk: Buffer) => {
     const text = chunk.toString();
     fullOutput += text;
     onData(text);
   });
 
   proc.on('close', (code) => {
-    onDone(code, fullOutput);
+    onDone(code ?? 1, fullOutput);
   });
 
   proc.on('error', (err) => {

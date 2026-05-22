@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
@@ -10,23 +10,24 @@ import { getActiveDraft } from './drafts.js';
 const execAsync = promisify(exec);
 export const publishRouter = Router();
 
-publishRouter.post('/', async (req, res) => {
+publishRouter.post('/', async (_req: Request, res: Response) => {
   try {
     const draft = getActiveDraft();
     if (!draft) {
-      return res.status(400).json({ error: 'No active draft to publish' });
+      res.status(400).json({ error: 'No active draft to publish' });
+      return;
     }
 
     await mergeBranch(config.appRepoPath, draft.branch);
     await deployLive();
 
     res.json({ ok: true, message: `Published ${draft.branch} to live` });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-async function deployLive() {
+async function deployLive(): Promise<void> {
   const livePath = config.liveClonePath;
 
   const exists = await fs.access(livePath).then(() => true).catch(() => false);
@@ -51,12 +52,12 @@ async function deployLive() {
   console.log('[publish] Live deployment complete. Restart live server process.');
 }
 
-publishRouter.get('/status', async (req, res) => {
+publishRouter.get('/status', async (_req: Request, res: Response) => {
   try {
     const livePath = config.liveClonePath;
     const exists = await fs.access(livePath).then(() => true).catch(() => false);
     res.json({ deployed: exists, livePath });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

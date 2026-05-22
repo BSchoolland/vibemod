@@ -1,33 +1,50 @@
 import fs from 'fs/promises';
 import path from 'path';
+import type { AppAdapter } from '../types.js';
 
-const adapters = {
+interface PackageJson {
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+interface AdapterDef {
+  name: string;
+  detect: (pkg: PackageJson, files: string[]) => boolean;
+  install: string | ((pkg: PackageJson) => string | null) | null;
+  build: string | ((pkg: PackageJson) => string | null) | null;
+  dev: string | ((pkg: PackageJson) => string | null) | null;
+  start: string | ((pkg: PackageJson) => string | null) | null;
+  startFile: string | null;
+}
+
+const adapters: Record<string, AdapterDef> = {
   'vite-react': {
     name: 'Vite + React',
-    detect: (pkg, files) => pkg.devDependencies?.vite && (pkg.dependencies?.react || pkg.devDependencies?.react),
+    detect: (pkg) => !!(pkg.devDependencies?.vite && (pkg.dependencies?.react || pkg.devDependencies?.react)),
     install: 'npm install',
     build: 'npm run build',
     dev: 'npm run dev',
-    start: 'npm run start',
+    start: 'npm start',
     startFile: null,
   },
 
   'next': {
     name: 'Next.js',
-    detect: (pkg) => pkg.dependencies?.next || pkg.devDependencies?.next,
+    detect: (pkg) => !!(pkg.dependencies?.next || pkg.devDependencies?.next),
     install: 'npm install',
     build: 'npm run build',
     dev: 'npm run dev',
-    start: 'npm run start',
+    start: 'npm start',
     startFile: null,
   },
 
   'node-express': {
     name: 'Node.js + Express',
-    detect: (pkg, files) => pkg.dependencies?.express && !pkg.dependencies?.next,
+    detect: (pkg) => !!(pkg.dependencies?.express && !pkg.dependencies?.next),
     install: 'npm install',
-    build: pkg => pkg.scripts?.build ? 'npm run build' : null,
-    dev: pkg => pkg.scripts?.dev ? 'npm run dev' : 'node server.js',
+    build: (pkg) => pkg.scripts?.build ? 'npm run build' : null,
+    dev: (pkg) => pkg.scripts?.dev ? 'npm run dev' : 'node server.js',
     start: 'npm start',
     startFile: null,
   },
@@ -43,9 +60,9 @@ const adapters = {
   },
 };
 
-export async function detectAdapter(appDir) {
-  let pkg = {};
-  let files = [];
+export async function detectAdapter(appDir: string): Promise<AppAdapter | null> {
+  let pkg: PackageJson = {};
+  let files: string[] = [];
 
   try {
     const raw = await fs.readFile(path.join(appDir, 'package.json'), 'utf-8');
@@ -69,7 +86,7 @@ export async function detectAdapter(appDir) {
   return null;
 }
 
-function resolveAdapter(adapter, pkg) {
+function resolveAdapter(adapter: AdapterDef, pkg: PackageJson): Omit<AppAdapter, 'id'> {
   return {
     name: adapter.name,
     install: typeof adapter.install === 'function' ? adapter.install(pkg) : adapter.install,
@@ -78,8 +95,4 @@ function resolveAdapter(adapter, pkg) {
     start: typeof adapter.start === 'function' ? adapter.start(pkg) : adapter.start,
     startFile: adapter.startFile,
   };
-}
-
-export function getAdapterById(id) {
-  return adapters[id] || null;
 }

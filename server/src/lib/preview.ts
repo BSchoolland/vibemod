@@ -1,20 +1,21 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import express from 'express';
-import { createServer } from 'http';
+import { createServer, type Server } from 'http';
 import path from 'path';
 import { config } from '../config.js';
+import type { AppAdapter } from '../types.js';
 
-let previewProcess = null;
-let staticServer = null;
+let previewProcess: ChildProcess | null = null;
+let staticServer: Server | null = null;
 
-export function startPreview(appDir, adapter) {
+export function startPreview(appDir: string, adapter: AppAdapter): void {
   stopPreview();
 
   if (adapter.startFile) {
     const app = express();
     app.use(express.static(appDir));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(appDir, adapter.startFile));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(appDir, adapter.startFile!));
     });
     staticServer = createServer(app);
     staticServer.listen(config.previewPort, () => {
@@ -34,11 +35,11 @@ export function startPreview(appDir, adapter) {
     shell: true,
   });
 
-  previewProcess.stdout.on('data', (chunk) => {
+  previewProcess.stdout!.on('data', (chunk: Buffer) => {
     console.log(`[preview] ${chunk.toString().trim()}`);
   });
 
-  previewProcess.stderr.on('data', (chunk) => {
+  previewProcess.stderr!.on('data', (chunk: Buffer) => {
     console.error(`[preview] ${chunk.toString().trim()}`);
   });
 
@@ -48,7 +49,7 @@ export function startPreview(appDir, adapter) {
   });
 }
 
-export function stopPreview() {
+export function stopPreview(): void {
   if (previewProcess) {
     previewProcess.kill();
     previewProcess = null;
@@ -57,8 +58,4 @@ export function stopPreview() {
     staticServer.close();
     staticServer = null;
   }
-}
-
-export function isPreviewRunning() {
-  return previewProcess !== null || staticServer !== null;
 }
