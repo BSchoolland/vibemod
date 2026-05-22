@@ -19,6 +19,7 @@ db.exec(`
     adapter_id TEXT,
     adapter_json TEXT,
     is_active INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'live')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -49,6 +50,10 @@ db.exec(`
     finished_at TEXT
   );
 `);
+
+try {
+  db.exec("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'live'))");
+} catch {}
 
 export { db };
 export type { DatabaseType };
