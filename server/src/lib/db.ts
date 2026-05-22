@@ -51,9 +51,44 @@ db.exec(`
   );
 `);
 
-try {
-  db.exec("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'live'))");
-} catch {}
+// Migrate: add status column if missing, or fix CHECK constraint if it has stale values
+{
+  const cols = db.prepare("PRAGMA table_info(drafts)").all() as Array<{ name: string }>;
+  const hasStatus = cols.some((c) => c.name === 'status');
+
+  if (!hasStatus) {
+    db.exec("ALTER TABLE drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'live'))");
+  } else {
+    // The column may exist with an old CHECK constraint (e.g. 'draft'/'published' instead of 'inactive').
+    // SQLite can't alter constraints, so rebuild the table.
+    const schema = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'drafts'").get() as { sql: string } | undefined;
+    if (schema && !schema.sql.includes("'inactive'")) {
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE drafts_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          branch TEXT NOT NULL,
+          path TEXT NOT NULL,
+          adapter_id TEXT,
+          adapter_json TEXT,
+          is_active INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'live')),
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO drafts_new (id, name, branch, path, adapter_id, adapter_json, is_active, status, created_at, updated_at)
+          SELECT id, name, branch, path, adapter_id, adapter_json, is_active,
+            CASE WHEN status = 'live' THEN 'live' ELSE 'inactive' END,
+            created_at, updated_at
+          FROM drafts;
+        DROP TABLE drafts;
+        ALTER TABLE drafts_new RENAME TO drafts;
+      `);
+      db.pragma('foreign_keys = ON');
+    }
+  }
+}
 
 export { db };
 export type { DatabaseType };

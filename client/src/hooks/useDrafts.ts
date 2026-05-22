@@ -86,24 +86,5 @@ export function useDrafts() {
     }
   }, [activeDraft, fetchAll]);
 
-  const publish = useCallback(async (name?: string) => {
-    const target = name || activeDraft?.name;
-    if (!target) return;
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: target }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      await fetchAll();
-      return data;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeDraft, fetchAll]);
-
-  return { drafts, activeDraft, isLoading, createDraft, activate, deleteDraft, rebuild, publish, refetch: fetchAll };
+  return { drafts, activeDraft, isLoading, createDraft, activate, deleteDraft, rebuild, refetch: fetchAll };
 }

@@ -15,7 +15,6 @@ interface ChatSidebarProps {
   isLoading: boolean;
   onCreateDraft: () => void;
   onActivate: (name: string) => void;
-  onPublish: () => void;
   onRebuild: () => void;
 }
 
@@ -83,7 +82,6 @@ export function ChatSidebar({
   isLoading,
   onCreateDraft,
   onActivate,
-  onPublish,
   onRebuild,
 }: ChatSidebarProps) {
   const [input, setInput] = useState('');
@@ -103,10 +101,7 @@ export function ChatSidebar({
   };
 
   return (
-    <div className="flex flex-col h-screen w-[400px] border-r border-border bg-card">
-      <div className="p-4 border-b border-border">
-        <h1 className="text-lg font-semibold">vibemod</h1>
-      </div>
+    <div className="flex flex-col h-full w-[400px] border-r border-border bg-card">
 
       <VersionList
         drafts={drafts}
@@ -117,12 +112,9 @@ export function ChatSidebar({
       />
 
       {activeDraft && (
-        <div className="px-3 py-2 border-b border-border flex gap-2">
+        <div className="px-3 py-2 border-b border-border">
           <Button size="sm" variant="outline" onClick={onRebuild} disabled={isLoading}>
             Rebuild
-          </Button>
-          <Button size="sm" onClick={onPublish} disabled={isLoading}>
-            Publish
           </Button>
         </div>
       )}

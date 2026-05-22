@@ -101,14 +101,25 @@ class DraftService {
   }
 
   async publish(name: string): Promise<void> {
+    await this.publishWithProgress(name, {});
+  }
+
+  async publishWithProgress(name: string, hooks: {
+    onCommit?: () => void;
+    onBuild?: () => void;
+    onStart?: () => void;
+  }): Promise<void> {
     const row = this.getByName(name);
     if (!row) throw new Error(`Draft "${name}" not found`);
 
     annotate({ draftName: row.name, draftBranch: row.branch });
 
     await time('commit', () => commitAll(row.path, `Publish ${row.name}`));
+    hooks.onCommit?.();
 
     const adapter = await time('build', () => buildService.installAndBuild(row.path, undefined, row.id));
+    hooks.onBuild?.();
+
     const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
 
     db.prepare("UPDATE drafts SET status = 'inactive' WHERE status = 'live'").run();
@@ -118,6 +129,7 @@ class DraftService {
 
     liveServer.stop();
     await liveServer.start(row.path, adapter);
+    hooks.onStart?.();
 
     log.info({ draftName: row.name }, 'published to live');
   }

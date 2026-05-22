@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { draftService } from '../services/draft-service.js';
-import { route, annotate, time } from '../lib/request-context.js';
+import { route, annotate } from '../lib/request-context.js';
 
 export const publishRouter = Router();
 
@@ -18,9 +18,27 @@ publishRouter.post('/', route(async (req, res) => {
 
   annotate({ draftName: draft.name, draftBranch: draft.branch });
 
-  await time('publish', () => draftService.publish(draft.name));
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-  res.json({ ok: true, message: `Published ${draft.name} to live` });
+  const send = (stage: string) => {
+    res.write(`data: ${JSON.stringify({ stage })}\n\n`);
+  };
+
+  try {
+    send('committing');
+    await draftService.publishWithProgress(draft.name, {
+      onCommit: () => send('building'),
+      onBuild: () => send('starting'),
+    });
+    send('done');
+  } catch (err: any) {
+    res.write(`data: ${JSON.stringify({ stage: 'error', error: err.message ?? String(err) })}\n\n`);
+  } finally {
+    res.end();
+  }
 }));
 
 publishRouter.get('/status', route((_req, res) => {
