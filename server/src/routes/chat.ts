@@ -1,51 +1,46 @@
-import { Router, type Request, type Response } from 'express';
+import { Router } from 'express';
 import { chatService } from '../services/chat-service.js';
 import { draftService } from '../services/draft-service.js';
+import { route, annotate } from '../lib/request-context.js';
 
 export const chatRouter = Router();
 
-chatRouter.post('/conversations', (req: Request, res: Response) => {
-  try {
-    const draft = draftService.getActive();
-    if (!draft) {
-      res.status(400).json({ error: 'No active draft' });
-      return;
-    }
-    const conversation = chatService.createConversation(draft.id, req.body.title);
-    res.json({ conversation });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+chatRouter.post('/conversations', route((req, res) => {
+  const draft = draftService.getActive();
+  if (!draft) {
+    res.status(400).json({ error: 'No active draft' });
+    return;
   }
-});
+  annotate({ draftId: draft.id });
+  const conversation = chatService.createConversation(draft.id, req.body.title);
+  annotate({ conversationId: conversation.id });
+  res.json({ conversation });
+}));
 
-chatRouter.get('/conversations', (_req: Request, res: Response) => {
-  try {
-    const draft = draftService.getActive();
-    if (!draft) {
-      res.json({ conversations: [] });
-      return;
-    }
-    const conversations = chatService.getConversationsForDraft(draft.id);
-    res.json({ conversations });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+chatRouter.get('/conversations', route((_req, res) => {
+  const draft = draftService.getActive();
+  if (!draft) {
+    res.json({ conversations: [] });
+    return;
   }
-});
+  annotate({ draftId: draft.id });
+  const conversations = chatService.getConversationsForDraft(draft.id);
+  annotate({ conversationCount: conversations.length });
+  res.json({ conversations });
+}));
 
-chatRouter.get('/conversations/:id/messages', (req: Request<{ id: string }>, res: Response) => {
-  try {
-    const messages = chatService.getMessages(Number(req.params.id));
-    res.json({ messages });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+chatRouter.get('/conversations/:id/messages', route((req, res) => {
+  const conversationId = Number(req.params.id);
+  annotate({ conversationId });
+  const messages = chatService.getMessages(conversationId);
+  annotate({ messageCount: messages.length });
+  res.json({ messages });
+}));
 
-chatRouter.post('/conversations/:id/messages', async (req: Request<{ id: string }>, res: Response) => {
-  try {
-    const aiMessage = await chatService.sendMessage(Number(req.params.id), req.body.content);
-    res.json({ message: aiMessage });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+chatRouter.post('/conversations/:id/messages', route(async (req, res) => {
+  const conversationId = Number(req.params.id);
+  annotate({ conversationId });
+  const aiMessage = await chatService.sendMessage(conversationId, req.body.content);
+  annotate({ aiMessageId: aiMessage.id });
+  res.json({ message: aiMessage });
+}));

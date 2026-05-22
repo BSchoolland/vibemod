@@ -1,5 +1,8 @@
 import type { Server } from 'http';
 import { previewServer, liveServer } from './servers.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('shutdown');
 
 let shuttingDown = false;
 
@@ -7,18 +10,17 @@ export function registerShutdown(httpServer: Server): void {
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`\n[shutdown] Received ${signal}, shutting down...`);
+    log.info({ signal }, 'shutting down');
 
     httpServer.close();
-    console.log('[shutdown] HTTP server closed');
+    log.info('http server closed');
 
     await Promise.all([
       previewServer.stopGraceful(3000),
       liveServer.stopGraceful(3000),
     ]);
-    console.log('[shutdown] All child processes stopped');
+    log.info('all child processes stopped');
 
-    console.log('[shutdown] Clean exit');
     process.exit(0);
   };
 

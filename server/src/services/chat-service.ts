@@ -1,6 +1,7 @@
 import { db } from '../lib/db.js';
 import { runAiCli } from '../lib/ai-cli.js';
 import { draftService } from './draft-service.js';
+import { annotate, time } from '../lib/request-context.js';
 
 export interface MessageRow {
   id: number;
@@ -58,23 +59,30 @@ class ChatService {
       throw new Error('Conversation does not belong to the active draft');
     }
 
+    annotate({ draftId: draft.id, draftName: draft.name });
+
     this.addMessage(conversationId, 'user', content);
 
-    const aiResponse = await new Promise<{ code: number; output: string }>((resolve) => {
-      runAiCli(
-        content,
-        draft.path,
-        () => {},
-        (code, fullOutput) => resolve({ code, output: fullOutput }),
-      );
-    });
+    const aiResponse = await time('aiCli', () =>
+      new Promise<{ code: number; output: string }>((resolve) => {
+        runAiCli(
+          content,
+          draft.path,
+          () => {},
+          (code, fullOutput) => resolve({ code, output: fullOutput }),
+        );
+      })
+    );
+
+    annotate({ aiCliExitCode: aiResponse.code });
 
     const aiMessage = this.addMessage(conversationId, 'ai', aiResponse.output);
 
     if (aiResponse.code === 0) {
       try {
-        await draftService.rebuild(draft.name);
+        await time('rebuild', () => draftService.rebuild(draft.name));
       } catch (err: any) {
+        annotate({ rebuildError: err.message });
         this.addMessage(conversationId, 'system', `Rebuild failed: ${err.message}`);
       }
     }
