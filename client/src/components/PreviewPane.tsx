@@ -3,9 +3,10 @@ import type { Draft } from '@/hooks/useDrafts';
 interface PreviewPaneProps {
   activeDraft: Draft | null;
   previewPort: number;
+  reloadKey: number;
 }
 
-export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
+export function PreviewPane({ activeDraft, previewPort, reloadKey }: PreviewPaneProps) {
   if (!activeDraft) {
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/30">
@@ -25,6 +26,7 @@ export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
         <span className="text-xs text-muted-foreground font-mono">{previewUrl}</span>
       </div>
       <iframe
+        key={reloadKey}
         src={previewUrl}
         className="flex-1 w-full border-0"
         title="Preview"

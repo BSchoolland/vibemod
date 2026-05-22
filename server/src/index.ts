@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
@@ -6,7 +7,22 @@ import { draftsRouter } from './routes/drafts.js';
 import { chatRouter, setChatWss } from './routes/chat.js';
 import { publishRouter } from './routes/publish.js';
 import { bootstrapAppRepo } from './lib/bootstrap.js';
+import { registerShutdown } from './lib/shutdown.js';
 import { config } from './config.js';
+
+function killPort(port: number): void {
+  try {
+    const pids = execSync(`lsof -t -i :${port}`, { encoding: 'utf-8' }).trim();
+    if (pids) {
+      for (const pid of pids.split('\n')) {
+        try { process.kill(Number(pid), 'SIGKILL'); } catch {}
+      }
+      console.log(`[startup] Killed stale process(es) on port ${port}`);
+    }
+  } catch {}
+}
+
+killPort(config.port);
 
 const app = express();
 const server = createServer(app);
@@ -24,6 +40,7 @@ app.get('/api/health', (_req, res) => {
 
 const wss = new WebSocketServer({ server, path: '/ws/chat' });
 setChatWss(wss);
+registerShutdown(server, wss);
 
 bootstrapAppRepo(config.seedPath).then(() => {
   server.listen(config.port, () => {

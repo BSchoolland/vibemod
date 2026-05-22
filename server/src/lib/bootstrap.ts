@@ -2,14 +2,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { spawn, type ChildProcess } from 'child_process';
 import { config } from '../config.js';
-import { detectAdapter } from './adapters.js';
+import { installAndBuild } from './deploy.js';
+import { liveServer } from './servers.js';
 
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
-
-let liveProcess: ChildProcess | null = null;
 
 export async function bootstrapAppRepo(seedPath: string): Promise<void> {
   const repoPath = config.appRepoPath;
@@ -53,53 +51,6 @@ export async function deployLive(): Promise<void> {
     });
   }
 
-  const adapter = await detectAdapter(livePath);
-  if (!adapter) {
-    console.error('[live] Could not detect app type, skipping live server');
-    return;
-  }
-
-  if (adapter.install) {
-    console.log('[live] Installing dependencies...');
-    await execAsync(adapter.install, { cwd: livePath });
-  }
-  if (adapter.build) {
-    console.log('[live] Building...');
-    await execAsync(adapter.build, { cwd: livePath });
-  }
-
-  startLiveServer(livePath, adapter);
-}
-
-function startLiveServer(appDir: string, adapter: { start: string | null; dev: string | null }): void {
-  if (liveProcess) {
-    liveProcess.kill();
-    liveProcess = null;
-  }
-
-  const startCmd = adapter.start || adapter.dev;
-  if (!startCmd) return;
-
-  const [cmd, ...args] = startCmd.split(' ');
-  liveProcess = spawn(cmd, args, {
-    cwd: appDir,
-    env: { ...process.env, PORT: String(config.livePort) },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: true,
-  });
-
-  liveProcess.stdout!.on('data', (chunk: Buffer) => {
-    console.log(`[live] ${chunk.toString().trim()}`);
-  });
-
-  liveProcess.stderr!.on('data', (chunk: Buffer) => {
-    console.error(`[live] ${chunk.toString().trim()}`);
-  });
-
-  liveProcess.on('close', (code) => {
-    console.log(`[live] process exited with code ${code}`);
-    liveProcess = null;
-  });
-
-  console.log(`[live] Server starting on port ${config.livePort}`);
+  const adapter = await installAndBuild(livePath);
+  await liveServer.start(livePath, adapter);
 }

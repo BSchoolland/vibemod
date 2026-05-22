@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { runAiCli } from '../lib/ai-cli.js';
 import { getActiveDraft } from './drafts.js';
+import { installAndBuild } from '../lib/deploy.js';
+import { previewServer } from '../lib/servers.js';
 import type { WsMessageIn, WsMessageOut } from '../types.js';
 
 export const chatRouter = Router();
@@ -53,7 +55,22 @@ function handleChat(prompt: string, ws: WebSocket): void {
     prompt,
     draft.path,
     (chunk) => broadcast({ type: 'ai-stream', content: chunk }),
-    (code, fullOutput) => broadcast({ type: 'ai-done', content: fullOutput, exitCode: code }),
+    async (code, fullOutput) => {
+      broadcast({ type: 'ai-done', content: fullOutput, exitCode: code });
+
+      if (code === 0) {
+        try {
+          broadcast({ type: 'status', content: 'Rebuilding preview...' });
+          const adapter = await installAndBuild(draft.path, draft.adapter);
+          draft.adapter = adapter;
+          previewServer.stop();
+          await previewServer.start(draft.path, adapter);
+          broadcast({ type: 'preview-reload' });
+        } catch (err: any) {
+          broadcast({ type: 'error', content: `Rebuild failed: ${err.message}` });
+        }
+      }
+    },
   );
 }
 
