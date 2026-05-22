@@ -1,7 +1,18 @@
 import path from 'path';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const envPath = path.join(__dirname, '..', '..', '.env');
+try {
+  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match && !process.env[match[1].trim()]) {
+      process.env[match[1].trim()] = match[2].trim();
+    }
+  }
+} catch {}
 
 export const config = {
   port: Number(process.env.PORT) || 3000,
@@ -11,4 +22,5 @@ export const config = {
   seedPath: process.env.SEED_PATH || path.join(__dirname, '..', '..', 'seed-app'),
   aiCli: process.env.AI_CLI || 'claude',
   aiCliArgs: process.env.AI_CLI_ARGS || '-p --dangerously-skip-permissions --model haiku',
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
 };

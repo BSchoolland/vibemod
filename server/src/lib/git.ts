@@ -41,6 +41,10 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
   return stdout.trim() ? 'main' : 'master';
 }
 
+export async function renameBranch(cwd: string, newBranchName: string): Promise<void> {
+  await git(['branch', '-m', newBranchName], cwd);
+}
+
 export async function commitAll(worktreePath: string, message: string): Promise<boolean> {
   const { stdout } = await git(['status', '--porcelain'], worktreePath);
   if (!stdout.trim()) return false;

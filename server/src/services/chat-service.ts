@@ -2,6 +2,11 @@ import { db } from '../lib/db.js';
 import { runAiCli } from '../lib/ai-cli.js';
 import { draftService } from './draft-service.js';
 import { annotate, time } from '../lib/request-context.js';
+import { generateBranchName } from '../lib/gemini.js';
+import { config } from '../config.js';
+import { createLogger } from '../lib/logger.js';
+
+const log = createLogger('chat-service');
 
 export interface MessageRow {
   id: number;
@@ -62,6 +67,12 @@ class ChatService {
     annotate({ draftId: draft.id, draftName: draft.name });
 
     this.addMessage(conversationId, 'user', content);
+
+    if (!draft.display_name && config.geminiApiKey) {
+      generateBranchName(content)
+        .then((name) => draftService.setDisplayName(draft.name, name))
+        .catch((err) => log.warn({ err: err.message }, 'branch naming failed'));
+    }
 
     const aiResponse = await time('aiCli', () =>
       new Promise<{ code: number; output: string }>((resolve) => {

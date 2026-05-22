@@ -7,14 +7,12 @@ import { createLogger } from '../lib/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOTS_DIR = path.join(__dirname, '..', '..', 'screenshots');
 const CHROME_PATH = '/usr/bin/google-chrome';
-const CAPTURE_DELAY_MS = 5000;
 const VIEWPORT = { width: 1280, height: 800 };
 
 const log = createLogger('screenshot');
 
 class ScreenshotService {
   private browser: Browser | null = null;
-  private pending: Map<number, NodeJS.Timeout> = new Map();
 
   private async ensureDir(): Promise<void> {
     await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
@@ -36,19 +34,11 @@ class ScreenshotService {
     return this.browser;
   }
 
-  scheduleCapture(draftId: number, port: number): void {
-    const existing = this.pending.get(draftId);
-    if (existing) clearTimeout(existing);
-
-    const timeout = setTimeout(() => {
-      this.pending.delete(draftId);
-      this.capture(draftId, port).catch((err) => {
-        log.error({ draftId, err }, 'screenshot capture failed');
-      });
-    }, CAPTURE_DELAY_MS);
-
-    this.pending.set(draftId, timeout);
-    log.info({ draftId, delayMs: CAPTURE_DELAY_MS }, 'screenshot scheduled');
+  captureWhenReady(draftId: number, port: number): void {
+    this.capture(draftId, port).catch((err) => {
+      log.error({ draftId, err }, 'screenshot capture failed');
+    });
+    log.info({ draftId }, 'screenshot capture started');
   }
 
   private async capture(draftId: number, port: number): Promise<void> {
@@ -86,11 +76,6 @@ class ScreenshotService {
   }
 
   async shutdown(): Promise<void> {
-    for (const timeout of this.pending.values()) {
-      clearTimeout(timeout);
-    }
-    this.pending.clear();
-
     if (this.browser) {
       await this.browser.close();
       this.browser = null;

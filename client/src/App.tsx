@@ -21,7 +21,7 @@ function Logo() {
 
 function App() {
   const { drafts, activeDraft, isLoading, createDraft, activate, rebuild, refetch } = useDrafts();
-  const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null);
+  const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null, refetch);
   const { state: publishState, publish, reset: publishReset } = usePublish(refetch);
 
   const handleRebuild = async () => {
@@ -68,7 +68,7 @@ function App() {
           isSending={isSending}
           activeDraft={activeDraft}
         />
-        <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} />
+        <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} isLoading={isLoading} isWorking={isSending} />
       </div>
     </div>
   );

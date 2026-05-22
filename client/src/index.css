@@ -195,3 +195,15 @@
   mask-composite: exclude;
   padding: 1px;
 }
+
+/* Animated neon border for "AI working" state */
+.card-neon-active {
+  padding: 2px;
+  background: linear-gradient(
+    90deg,
+    #FF1493, #FF00FF, #00FFFF, #39FF14,
+    #FFFF00, #FF6B35, #FF3131, #FF1493
+  );
+  background-size: 200% 100%;
+  animation: neon-shift 4s linear infinite;
+}

@@ -7,6 +7,7 @@ export interface Draft {
   path: string;
   adapter_id: string | null;
   adapter_json: string | null;
+  display_name: string | null;
   is_active: number;
   status: 'inactive' | 'live';
   created_at: string;

@@ -68,7 +68,7 @@ export function DraftSelector({
         className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border/50 bg-secondary/60 hover:bg-secondary hover:border-neon-pink/30 transition-all text-sm font-medium disabled:opacity-50"
       >
         <span className="font-mono text-sm text-foreground">
-          {activeDraft?.name ?? 'No draft selected'}
+          {activeDraft?.display_name ?? activeDraft?.name ?? 'No draft selected'}
         </span>
         {activeDraft?.status === 'live' && (
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green border border-neon-green/20">
@@ -148,7 +148,7 @@ export function DraftSelector({
                             <Check className="w-3.5 h-3.5 text-neon-pink shrink-0" />
                           )}
                           <span className="flex-1 truncate font-mono text-xs text-foreground">
-                            {draft.name}
+                            {draft.display_name ?? draft.name}
                           </span>
                           {draft.status === 'live' && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green border border-neon-green/20">

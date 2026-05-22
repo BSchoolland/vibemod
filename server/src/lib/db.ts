@@ -90,5 +90,13 @@ db.exec(`
   }
 }
 
+// Add display_name column if missing
+{
+  const cols = db.prepare("PRAGMA table_info(drafts)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'display_name')) {
+    db.exec("ALTER TABLE drafts ADD COLUMN display_name TEXT");
+  }
+}
+
 export { db };
 export type { DatabaseType };

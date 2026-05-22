@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { db } from '../lib/db.js';
 import { config } from '../config.js';
-import { createWorktree, removeWorktree, commitAll } from '../lib/git.js';
+import { createWorktree, removeWorktree, commitAll, renameBranch } from '../lib/git.js';
 import { previewServer, liveServer } from '../lib/servers.js';
 import { buildService } from './build-service.js';
 import { createLogger } from '../lib/logger.js';
@@ -19,6 +19,7 @@ export interface DraftRow {
   path: string;
   adapter_id: string | null;
   adapter_json: string | null;
+  display_name: string | null;
   is_active: number;
   status: 'inactive' | 'live';
   created_at: string;
@@ -82,7 +83,7 @@ class DraftService {
     await previewServer.start(worktreePath, adapter);
 
     const row = db.prepare('SELECT * FROM drafts WHERE id = ?').get(result.lastInsertRowid) as DraftRow;
-    screenshotService.scheduleCapture(row.id, config.previewPort);
+    screenshotService.captureWhenReady(row.id, config.previewPort);
     return { ...row, adapter };
   }
 
@@ -97,7 +98,7 @@ class DraftService {
     const adapter = adapterFromRow(row);
     if (adapter) {
       await previewServer.start(row.path, adapter);
-      screenshotService.scheduleCapture(row.id, config.previewPort);
+      screenshotService.captureWhenReady(row.id, config.previewPort);
     }
 
     return { ...row, is_active: 1, adapter };
@@ -151,6 +152,20 @@ class DraftService {
     db.prepare('DELETE FROM drafts WHERE id = ?').run(row.id);
   }
 
+  async setDisplayName(name: string, displayName: string): Promise<void> {
+    const row = this.getByName(name);
+    if (!row) throw new Error(`Draft "${name}" not found`);
+
+    const newBranch = `draft/${displayName}`;
+    await renameBranch(row.path, newBranch);
+
+    db.prepare(
+      "UPDATE drafts SET display_name = ?, branch = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(displayName, newBranch, row.id);
+
+    log.info({ draftName: name, displayName, newBranch }, 'renamed draft');
+  }
+
   async rebuild(name: string): Promise<AppAdapter> {
     const row = this.getByName(name);
     if (!row) throw new Error(`Draft "${name}" not found`);
@@ -164,7 +179,7 @@ class DraftService {
     if (row.is_active) {
       previewServer.stop();
       await previewServer.start(row.path, adapter);
-      screenshotService.scheduleCapture(row.id, config.previewPort);
+      screenshotService.captureWhenReady(row.id, config.previewPort);
     }
 
     if (row.status === 'live') {

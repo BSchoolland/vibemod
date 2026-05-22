@@ -1,12 +1,22 @@
-import { Globe } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Globe, Loader2 } from 'lucide-react';
 import type { Draft } from '@/hooks/useDrafts';
 
 interface PreviewPaneProps {
   activeDraft: Draft | null;
   previewPort: number;
+  isLoading?: boolean;
+  isWorking?: boolean;
 }
 
-export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
+export function PreviewPane({ activeDraft, previewPort, isLoading, isWorking }: PreviewPaneProps) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const showSpinner = isLoading || (activeDraft && !iframeLoaded);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [activeDraft?.updated_at]);
+
   if (!activeDraft) {
     return (
       <div className="flex-1 rounded-2xl bg-card border border-border/50 flex items-center justify-center card-neon">
@@ -24,21 +34,34 @@ export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
   const previewUrl = `${window.location.protocol}//${window.location.hostname}:${previewPort}`;
 
   return (
-    <div className="flex-1 rounded-2xl bg-card border border-border/50 flex flex-col overflow-hidden card-neon">
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary/50 border-b border-border/50">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-neon-red" />
-          <span className="w-3 h-3 rounded-full bg-neon-yellow" />
-          <span className="w-3 h-3 rounded-full bg-neon-green" />
+    <div className={`flex-1 rounded-2xl p-[2px] ${isWorking ? 'card-neon-active' : 'bg-border/50'}`}>
+      <div className="h-full rounded-2xl bg-card flex flex-col overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary/50 border-b border-border/50">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-neon-red" />
+            <span className="w-3 h-3 rounded-full bg-neon-yellow" />
+            <span className="w-3 h-3 rounded-full bg-neon-green" />
+          </div>
+        </div>
+
+        <div className="relative flex-1">
+          {showSpinner && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-neon-pink animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading preview…</span>
+              </div>
+            </div>
+          )}
+          <iframe
+            key={activeDraft.updated_at}
+            src={previewUrl}
+            className="absolute inset-0 w-full h-full border-0"
+            title="Preview"
+            onLoad={() => setIframeLoaded(true)}
+          />
         </div>
       </div>
-
-      <iframe
-        key={activeDraft.updated_at}
-        src={previewUrl}
-        className="flex-1 w-full border-0"
-        title="Preview"
-      />
     </div>
   );
 }
