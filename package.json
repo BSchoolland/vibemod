@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node start.js",
-    "install:all": "cd server && npm install && cd ../client && npm install"
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "reset-app": "./scripts/reset-app.sh",
+    "set-app": "./scripts/set-app.sh"
   }
 }

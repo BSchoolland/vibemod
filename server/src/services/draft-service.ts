@@ -160,16 +160,23 @@ class DraftService {
   }
 
   async restoreServers(): Promise<void> {
-    const live = this.getLive();
-    if (live?.adapter && !liveServer.running) {
-      log.info({ draftName: live.name }, 'restoring live server');
-      await liveServer.start(live.path, live.adapter);
-    }
+    for (const draft of [this.getLive(), this.getActive()]) {
+      if (!draft?.adapter) continue;
 
-    const active = this.getActive();
-    if (active?.adapter && !previewServer.running) {
-      log.info({ draftName: active.name }, 'restoring preview server');
-      await previewServer.start(active.path, active.adapter);
+      const pathExists = await fs.access(draft.path).then(() => true).catch(() => false);
+      if (!pathExists) {
+        log.info({ draftName: draft.name }, 'stale draft — worktree missing, cleaning up');
+        db.prepare('DELETE FROM drafts WHERE id = ?').run(draft.id);
+        continue;
+      }
+
+      const isLive = (draft as DraftRow).status === 'live';
+      const server = isLive ? liveServer : previewServer;
+
+      if (!server.running) {
+        log.info({ draftName: draft.name }, isLive ? 'restoring live server' : 'restoring preview server');
+        await server.start(draft.path, draft.adapter);
+      }
     }
   }
 }

@@ -1,164 +1,147 @@
 import { useState, useEffect } from "react";
+import Sidebar from "./components/Sidebar.jsx";
+import Header from "./components/Header.jsx";
+import StatCard from "./components/StatCard.jsx";
+import TrafficChart from "./components/TrafficChart.jsx";
+import ChannelChart from "./components/ChannelChart.jsx";
+import PagesTable from "./components/PagesTable.jsx";
 
-const API_BASE = "/api/habits";
+const PAGE_TITLES = {
+  overview: "Overview",
+  traffic: "Traffic",
+  channels: "Channels",
+  pages: "Top Pages",
+};
 
-function getToday() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function calculateStreak(completions) {
-  if (!completions || completions.length === 0) return 0;
-
-  const sorted = [...completions].sort().reverse();
-  const today = getToday();
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-
-  // Streak must include today or yesterday to be active
-  if (sorted[0] !== today && sorted[0] !== yesterday) return 0;
-
-  let streak = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const current = new Date(sorted[i - 1]);
-    const prev = new Date(sorted[i]);
-    const diffDays = (current - prev) / 86400000;
-    if (diffDays === 1) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-  return streak;
+function formatNumber(n) {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toString();
 }
 
 export default function App() {
-  const [habits, setHabits] = useState([]);
-  const [newHabit, setNewHabit] = useState("");
+  const [activePage, setActivePage] = useState("overview");
+  const [summary, setSummary] = useState(null);
+  const [traffic, setTraffic] = useState([]);
+  const [channels, setChannels] = useState([]);
+  const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeMetric, setActiveMetric] = useState(null);
 
-  useEffect(() => {
-    fetchHabits();
-  }, []);
-
-  async function fetchHabits() {
+  async function fetchAll() {
+    setLoading(true);
     try {
-      const res = await fetch(API_BASE);
-      const data = await res.json();
-      setHabits(data);
+      const [summaryRes, trafficRes, channelsRes, pagesRes] = await Promise.all([
+        fetch("/api/summary"),
+        fetch("/api/traffic"),
+        fetch("/api/channels"),
+        fetch("/api/pages"),
+      ]);
+      setSummary(await summaryRes.json());
+      setTraffic(await trafficRes.json());
+      setChannels(await channelsRes.json());
+      setPages(await pagesRes.json());
     } catch (err) {
-      console.error("Failed to fetch habits:", err);
+      console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  async function addHabit(e) {
-    e.preventDefault();
-    if (!newHabit.trim()) return;
-
-    try {
-      const res = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newHabit }),
-      });
-      const habit = await res.json();
-      setHabits([...habits, habit]);
-      setNewHabit("");
-    } catch (err) {
-      console.error("Failed to add habit:", err);
-    }
+  async function handleRefresh() {
+    await fetch("/api/refresh", { method: "POST" });
+    await fetchAll();
   }
 
-  async function toggleHabit(id) {
-    try {
-      const res = await fetch(`${API_BASE}/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: getToday() }),
-      });
-      const updated = await res.json();
-      setHabits(habits.map((h) => (h.id === id ? updated : h)));
-    } catch (err) {
-      console.error("Failed to toggle habit:", err);
-    }
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  function handleStatClick(metric) {
+    setActiveMetric(activeMetric === metric ? null : metric);
   }
 
-  async function deleteHabit(id) {
-    try {
-      await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
-      setHabits(habits.filter((h) => h.id !== id));
-    } catch (err) {
-      console.error("Failed to delete habit:", err);
-    }
-  }
-
-  if (loading) {
+  if (loading || !summary) {
     return (
-      <div className="app">
-        <h1>Habit Tracker</h1>
-        <p className="loading">Loading...</p>
+      <div className="layout">
+        <Sidebar activePage={activePage} onNavigate={setActivePage} />
+        <div className="main">
+          <Header title="Dashboard" onRefresh={handleRefresh} />
+          <div className="main__content">
+            <div className="loading-state">Loading dashboard...</div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const today = getToday();
+  const stats = [
+    {
+      key: "visitors",
+      label: "Total Visitors",
+      value: formatNumber(summary.totalVisitors),
+      detail: "Last 30 days",
+      color: "#6366f1",
+    },
+    {
+      key: "pageViews",
+      label: "Page Views",
+      value: formatNumber(summary.totalPageViews),
+      detail: "Last 30 days",
+      color: "#06b6d4",
+    },
+    {
+      key: "sessions",
+      label: "Sessions",
+      value: formatNumber(summary.totalSessions),
+      detail: `Avg. ${summary.avgSessionDuration}`,
+      color: "#f59e0b",
+    },
+    {
+      key: "bounceRate",
+      label: "Bounce Rate",
+      value: `${summary.avgBounceRate}%`,
+      detail: `${summary.conversionRate}% conversion`,
+      color: "#ef4444",
+    },
+  ];
+
+  const showStats = activePage === "overview" || activePage === "traffic";
+  const showTraffic = activePage === "overview" || activePage === "traffic";
+  const showChannels = activePage === "overview" || activePage === "channels";
+  const showPages = activePage === "overview" || activePage === "pages";
 
   return (
-    <div className="app">
-      <h1>Habit Tracker</h1>
-
-      <form className="add-form" onSubmit={addHabit}>
-        <input
-          type="text"
-          value={newHabit}
-          onChange={(e) => setNewHabit(e.target.value)}
-          placeholder="Add a new habit..."
-        />
-        <button type="submit">Add</button>
-      </form>
-
-      {habits.length === 0 ? (
-        <p className="empty-state">
-          No habits yet. Add one above to get started!
-        </p>
-      ) : (
-        <ul className="habit-list">
-          {habits.map((habit) => {
-            const isCompletedToday = habit.completions.includes(today);
-            const streak = calculateStreak(habit.completions);
-
-            return (
-              <li key={habit.id} className="habit-item">
-                <div
-                  className={`habit-checkbox ${isCompletedToday ? "checked" : ""}`}
-                  onClick={() => toggleHabit(habit.id)}
-                  role="checkbox"
-                  aria-checked={isCompletedToday}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") toggleHabit(habit.id);
-                  }}
+    <div className="layout">
+      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <div className="main">
+        <Header title={PAGE_TITLES[activePage]} onRefresh={handleRefresh} />
+        <div className="main__content">
+          {showStats && (
+            <div className="stat-grid">
+              {stats.map((s) => (
+                <StatCard
+                  key={s.key}
+                  label={s.label}
+                  value={s.value}
+                  detail={s.detail}
+                  color={s.color}
+                  active={activeMetric === s.key}
+                  onClick={() => handleStatClick(s.key)}
                 />
-                <div className="habit-info">
-                  <div className={`habit-name ${isCompletedToday ? "completed" : ""}`}>
-                    {habit.name}
-                  </div>
-                  <div className={`habit-streak ${streak > 0 ? "active" : ""}`}>
-                    {streak > 0 ? `${streak} day streak` : "No streak"}
-                  </div>
-                </div>
-                <button
-                  className="delete-btn"
-                  onClick={() => deleteHabit(habit.id)}
-                  title="Delete habit"
-                >
-                  &times;
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              ))}
+            </div>
+          )}
+
+          {showTraffic && (
+            <TrafficChart data={traffic} activeMetric={activeMetric} />
+          )}
+
+          <div className={`charts-row ${showChannels && showPages ? "" : "charts-row--single"}`}>
+            {showChannels && <ChannelChart data={channels} />}
+            {showPages && <PagesTable data={pages} />}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
