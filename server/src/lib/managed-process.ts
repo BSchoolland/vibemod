@@ -50,9 +50,12 @@ export class ManagedProcess {
       console.error(`[${this.label}] ${chunk.toString().trim()}`);
     });
 
-    this.process.on('close', (code) => {
+    const spawned = this.process;
+    spawned.on('close', (code) => {
       console.log(`[${this.label}] process exited with code ${code}`);
-      this.process = null;
+      if (this.process === spawned) {
+        this.process = null;
+      }
     });
 
     console.log(`[${this.label}] Server starting on port ${this.port} (pid ${this.process.pid})`);
