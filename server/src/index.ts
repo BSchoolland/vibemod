@@ -1,13 +1,13 @@
 import { execSync } from 'child_process';
 import express from 'express';
 import cors from 'cors';
-import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { draftsRouter } from './routes/drafts.js';
-import { chatRouter, setChatWss } from './routes/chat.js';
+import { chatRouter } from './routes/chat.js';
 import { publishRouter } from './routes/publish.js';
 import { bootstrapAppRepo } from './lib/bootstrap.js';
 import { registerShutdown } from './lib/shutdown.js';
+import { draftService } from './services/draft-service.js';
 import { config } from './config.js';
 
 function killPort(port: number): void {
@@ -38,11 +38,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-const wss = new WebSocketServer({ server, path: '/ws/chat' });
-setChatWss(wss);
-registerShutdown(server, wss);
+registerShutdown(server);
 
-bootstrapAppRepo(config.seedPath).then(() => {
+bootstrapAppRepo(config.seedPath).then(async () => {
+  await draftService.restoreActive();
   server.listen(config.port, () => {
     console.log(`Vibemod server running on port ${config.port}`);
   });

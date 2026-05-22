@@ -1,79 +1,51 @@
-import { Router } from 'express';
-import { WebSocketServer, WebSocket } from 'ws';
-import { runAiCli } from '../lib/ai-cli.js';
-import { getActiveDraft } from './drafts.js';
-import { installAndBuild } from '../lib/deploy.js';
-import { previewServer } from '../lib/servers.js';
-import type { WsMessageIn, WsMessageOut } from '../types.js';
+import { Router, type Request, type Response } from 'express';
+import { chatService } from '../services/chat-service.js';
+import { draftService } from '../services/draft-service.js';
 
 export const chatRouter = Router();
-let wss: WebSocketServer | null = null;
 
-export function setChatWss(webSocketServer: WebSocketServer): void {
-  wss = webSocketServer;
-
-  wss.on('connection', (ws) => {
-    ws.on('message', (raw) => {
-      try {
-        const msg: WsMessageIn = JSON.parse(raw.toString());
-        if (msg.type === 'chat') {
-          handleChat(msg.content, ws);
-        }
-      } catch {
-        send(ws, { type: 'error', content: 'Invalid message' });
-      }
-    });
-  });
-}
-
-function send(ws: WebSocket, data: WsMessageOut): void {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
-
-function broadcast(data: WsMessageOut): void {
-  if (!wss) return;
-  const msg = JSON.stringify(data);
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
+chatRouter.post('/conversations', (req: Request, res: Response) => {
+  try {
+    const draft = draftService.getActive();
+    if (!draft) {
+      res.status(400).json({ error: 'No active draft' });
+      return;
     }
+    const conversation = chatService.createConversation(draft.id, req.body.title);
+    res.json({ conversation });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-}
+});
 
-function handleChat(prompt: string, ws: WebSocket): void {
-  const draft = getActiveDraft();
-  if (!draft) {
-    send(ws, { type: 'error', content: 'No active draft. Create a draft first.' });
-    return;
+chatRouter.get('/conversations', (_req: Request, res: Response) => {
+  try {
+    const draft = draftService.getActive();
+    if (!draft) {
+      res.json({ conversations: [] });
+      return;
+    }
+    const conversations = chatService.getConversationsForDraft(draft.id);
+    res.json({ conversations });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
+});
 
-  send(ws, { type: 'status', content: 'AI is thinking...' });
+chatRouter.get('/conversations/:id/messages', (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const messages = chatService.getMessages(Number(req.params.id));
+    res.json({ messages });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-  runAiCli(
-    prompt,
-    draft.path,
-    (chunk) => broadcast({ type: 'ai-stream', content: chunk }),
-    async (code, fullOutput) => {
-      broadcast({ type: 'ai-done', content: fullOutput, exitCode: code });
-
-      if (code === 0) {
-        try {
-          broadcast({ type: 'status', content: 'Rebuilding preview...' });
-          const adapter = await installAndBuild(draft.path, draft.adapter);
-          draft.adapter = adapter;
-          previewServer.stop();
-          await previewServer.start(draft.path, adapter);
-          broadcast({ type: 'preview-reload' });
-        } catch (err: any) {
-          broadcast({ type: 'error', content: `Rebuild failed: ${err.message}` });
-        }
-      }
-    },
-  );
-}
-
-chatRouter.get('/history', (_req, res) => {
-  res.json({ messages: [] });
+chatRouter.post('/conversations/:id/messages', async (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const aiMessage = await chatService.sendMessage(Number(req.params.id), req.body.content);
+    res.json({ message: aiMessage });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });

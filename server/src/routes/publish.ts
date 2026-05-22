@@ -3,13 +3,13 @@ import fs from 'fs/promises';
 import { config } from '../config.js';
 import { mergeBranch } from '../lib/git.js';
 import { deployLive } from '../lib/bootstrap.js';
-import { getActiveDraft } from './drafts.js';
+import { draftService } from '../services/draft-service.js';
 
 export const publishRouter = Router();
 
 publishRouter.post('/', async (_req: Request, res: Response) => {
   try {
-    const draft = getActiveDraft();
+    const draft = draftService.getActive();
     if (!draft) {
       res.status(400).json({ error: 'No active draft to publish' });
       return;
