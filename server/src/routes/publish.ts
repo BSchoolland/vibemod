@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import fs from 'fs/promises';
 import { config } from '../config.js';
-import { mergeBranch } from '../lib/git.js';
+import { commitAll, mergeBranch } from '../lib/git.js';
 import { deployLive } from '../lib/bootstrap.js';
 import { draftService } from '../services/draft-service.js';
 
@@ -15,6 +15,7 @@ publishRouter.post('/', async (_req: Request, res: Response) => {
       return;
     }
 
+    await commitAll(draft.path, `Draft changes from ${draft.name}`);
     await mergeBranch(config.appRepoPath, draft.branch);
     await deployLive();
 
