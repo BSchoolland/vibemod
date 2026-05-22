@@ -17,7 +17,7 @@ export interface Conversation {
 
 const POLL_INTERVAL = 2000;
 
-export function useChat(draftId: number | null, onPoll?: () => void) {
+export function useChat(draftId: number | null) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -54,11 +54,8 @@ export function useChat(draftId: number | null, onPoll?: () => void) {
 
   const startPolling = useCallback((convoId: number) => {
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      fetchMessages(convoId);
-      onPoll?.();
-    }, POLL_INTERVAL);
-  }, [fetchMessages, onPoll]);
+    pollRef.current = setInterval(() => fetchMessages(convoId), POLL_INTERVAL);
+  }, [fetchMessages]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {

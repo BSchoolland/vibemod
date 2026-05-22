@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ChatSidebar } from '@/components/ChatSidebar';
 import { PreviewPane } from '@/components/PreviewPane';
 import { PushToLiveButton } from '@/components/PushToLiveButton';
@@ -21,8 +22,14 @@ function Logo() {
 
 function App() {
   const { drafts, activeDraft, isLoading, createDraft, activate, rebuild, refetch } = useDrafts();
-  const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null, refetch);
+  const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null);
   const { state: publishState, publish, reset: publishReset } = usePublish(refetch);
+
+  const wasSending = useRef(false);
+  useEffect(() => {
+    if (wasSending.current && !isSending) refetch();
+    wasSending.current = isSending;
+  }, [isSending, refetch]);
 
   const handleRebuild = async () => {
     await rebuild();
@@ -61,10 +68,7 @@ function App() {
       <div className="flex flex-1 min-h-0 p-3 gap-3">
         <ChatSidebar
           messages={messages}
-          onSend={async (msg) => {
-            await sendMessage(msg);
-            await refetch();
-          }}
+          onSend={sendMessage}
           isSending={isSending}
           activeDraft={activeDraft}
         />

@@ -10,8 +10,14 @@ export function runAiCli(
   onData: (chunk: string) => void,
   onDone: (code: number, fullOutput: string) => void,
 ): ChildProcess {
-  const args = config.aiCliArgs.split(' ').filter(Boolean);
-  args.push(prompt);
+  const cliArgs = config.aiCliArgs.split(' ').filter(Boolean);
+  const pIndex = cliArgs.indexOf('-p');
+  if (pIndex !== -1) {
+    cliArgs.splice(pIndex + 1, 0, prompt);
+  } else {
+    cliArgs.push('-p', prompt);
+  }
+  const args = [...cliArgs, '--add-dir', cwd];
 
   log.info({ cwd, cli: config.aiCli }, 'starting');
 
