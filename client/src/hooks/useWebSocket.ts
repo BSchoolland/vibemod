@@ -12,6 +12,7 @@ export function useWebSocket() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
   const streamBufferRef = useRef('');
 
   useEffect(() => {
@@ -69,6 +70,10 @@ export function useWebSocket() {
           streamBufferRef.current = '';
           break;
 
+        case 'preview-reload':
+          setPreviewReloadKey((k) => k + 1);
+          break;
+
         case 'error':
           setIsAiThinking(false);
           setMessages((prev) => [
@@ -103,5 +108,5 @@ export function useWebSocket() {
     wsRef.current.send(JSON.stringify({ type: 'chat', content }));
   }, []);
 
-  return { messages, sendMessage, isConnected, isAiThinking };
+  return { messages, sendMessage, isConnected, isAiThinking, previewReloadKey };
 }

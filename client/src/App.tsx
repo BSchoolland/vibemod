@@ -6,7 +6,7 @@ import { useDrafts } from '@/hooks/useDrafts';
 const PREVIEW_PORT = 3002;
 
 function App() {
-  const { messages, sendMessage, isConnected, isAiThinking } = useWebSocket();
+  const { messages, sendMessage, isConnected, isAiThinking, previewReloadKey } = useWebSocket();
   const { activeDraft, isLoading, createDraft, publish, rebuild } = useDrafts();
 
   return (
@@ -22,7 +22,7 @@ function App() {
         onPublish={() => publish()}
         onRebuild={() => rebuild()}
       />
-      <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} />
+      <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} reloadKey={previewReloadKey} />
     </div>
   );
 }
