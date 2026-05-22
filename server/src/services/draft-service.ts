@@ -7,6 +7,7 @@ import { previewServer, liveServer } from '../lib/servers.js';
 import { buildService } from './build-service.js';
 import { createLogger } from '../lib/logger.js';
 import { annotate, time } from '../lib/request-context.js';
+import { screenshotService } from './screenshot-service.js';
 import type { AppAdapter } from '../types.js';
 
 const log = createLogger('draft-service');
@@ -81,6 +82,7 @@ class DraftService {
     await previewServer.start(worktreePath, adapter);
 
     const row = db.prepare('SELECT * FROM drafts WHERE id = ?').get(result.lastInsertRowid) as DraftRow;
+    screenshotService.scheduleCapture(row.id, config.previewPort);
     return { ...row, adapter };
   }
 
@@ -95,6 +97,7 @@ class DraftService {
     const adapter = adapterFromRow(row);
     if (adapter) {
       await previewServer.start(row.path, adapter);
+      screenshotService.scheduleCapture(row.id, config.previewPort);
     }
 
     return { ...row, is_active: 1, adapter };
@@ -161,6 +164,7 @@ class DraftService {
     if (row.is_active) {
       previewServer.stop();
       await previewServer.start(row.path, adapter);
+      screenshotService.scheduleCapture(row.id, config.previewPort);
     }
 
     if (row.status === 'live') {

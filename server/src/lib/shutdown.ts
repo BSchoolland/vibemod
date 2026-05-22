@@ -1,5 +1,6 @@
 import type { Server } from 'http';
 import { previewServer, liveServer } from './servers.js';
+import { screenshotService } from '../services/screenshot-service.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('shutdown');
@@ -18,6 +19,7 @@ export function registerShutdown(httpServer: Server): void {
     await Promise.all([
       previewServer.stopGraceful(3000),
       liveServer.stopGraceful(3000),
+      screenshotService.shutdown(),
     ]);
     log.info('all child processes stopped');
 

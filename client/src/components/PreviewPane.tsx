@@ -31,12 +31,6 @@ export function PreviewPane({ activeDraft, previewPort }: PreviewPaneProps) {
           <span className="w-3 h-3 rounded-full bg-neon-yellow" />
           <span className="w-3 h-3 rounded-full bg-neon-green" />
         </div>
-        <div className="flex-1 flex justify-center">
-          <div className="bg-muted rounded-lg border border-border/50 px-4 py-1 text-xs text-muted-foreground font-mono max-w-sm w-full text-center select-all">
-            {previewUrl}
-          </div>
-        </div>
-        <div className="w-[54px]" />
       </div>
 
       <iframe

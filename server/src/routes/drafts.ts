@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { draftService } from '../services/draft-service.js';
+import { screenshotService } from '../services/screenshot-service.js';
 import { route, annotate } from '../lib/request-context.js';
 
 export const draftsRouter = Router();
@@ -39,4 +40,16 @@ draftsRouter.post('/:name/rebuild', route(async (req, res) => {
   const adapter = await draftService.rebuild(name);
   annotate({ adapterId: adapter.id });
   res.json({ ok: true, adapter });
+}));
+
+draftsRouter.get('/:name/screenshot', route(async (req, res) => {
+  const name = req.params.name as string;
+  const draft = draftService.getByName(name);
+  if (!draft) { res.status(404).json({ error: 'Draft not found' }); return; }
+
+  if (await screenshotService.exists(draft.id)) {
+    res.sendFile(screenshotService.screenshotPath(draft.id));
+  } else {
+    res.status(404).json({ error: 'No screenshot available' });
+  }
 }));

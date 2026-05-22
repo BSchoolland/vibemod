@@ -4,6 +4,7 @@ dist-ssr/
 app-repo/
 app-live/
 worktrees/
+screenshots/
 
 *.log
 *.local
