@@ -1,0 +1,143 @@
+import { spawn, execSync, type ChildProcess } from 'child_process';
+import express from 'express';
+import { createServer, type Server } from 'http';
+import path from 'path';
+
+interface ManagedProcessOptions {
+  label: string;
+  port: number;
+}
+
+export class ManagedProcess {
+  private process: ChildProcess | null = null;
+  private staticServer: Server | null = null;
+  readonly label: string;
+  readonly port: number;
+
+  constructor({ label, port }: ManagedProcessOptions) {
+    this.label = label;
+    this.port = port;
+  }
+
+  start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): void {
+    this.stop();
+    this.killPortHolder();
+
+    if (adapter.startFile) {
+      this.startStatic(appDir, adapter.startFile);
+      return;
+    }
+
+    const startCmd = adapter.start || adapter.dev;
+    if (!startCmd) return;
+
+    const [cmd, ...args] = startCmd.split(' ');
+    this.process = spawn(cmd, args, {
+      cwd: appDir,
+      env: { ...process.env, PORT: String(this.port) },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: true,
+      detached: true,
+    });
+
+    this.process.stdout!.on('data', (chunk: Buffer) => {
+      console.log(`[${this.label}] ${chunk.toString().trim()}`);
+    });
+
+    this.process.stderr!.on('data', (chunk: Buffer) => {
+      console.error(`[${this.label}] ${chunk.toString().trim()}`);
+    });
+
+    this.process.on('close', (code) => {
+      console.log(`[${this.label}] process exited with code ${code}`);
+      this.process = null;
+    });
+
+    console.log(`[${this.label}] Server starting on port ${this.port} (pid ${this.process.pid})`);
+  }
+
+  stop(): void {
+    if (this.process) {
+      this.killTree(this.process.pid!);
+      this.process = null;
+    }
+    if (this.staticServer) {
+      this.staticServer.close();
+      this.staticServer = null;
+    }
+  }
+
+  async stopGraceful(timeoutMs = 5000): Promise<void> {
+    if (!this.process && !this.staticServer) return;
+
+    if (this.staticServer) {
+      await new Promise<void>((resolve) => {
+        this.staticServer!.close(() => resolve());
+      });
+      this.staticServer = null;
+      console.log(`[${this.label}] Static server closed`);
+      return;
+    }
+
+    if (!this.process) return;
+
+    const pid = this.process.pid!;
+    this.killTree(pid, 'SIGTERM');
+
+    const exited = await Promise.race([
+      new Promise<boolean>((resolve) => {
+        this.process?.on('close', () => resolve(true));
+      }),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+
+    if (!exited) {
+      console.log(`[${this.label}] Graceful shutdown timed out, sending SIGKILL`);
+      this.killTree(pid, 'SIGKILL');
+      this.killPortHolder();
+    }
+
+    this.process = null;
+    console.log(`[${this.label}] Stopped`);
+  }
+
+  get running(): boolean {
+    return this.process !== null || this.staticServer !== null;
+  }
+
+  private killTree(pid: number, signal: NodeJS.Signals = 'SIGKILL'): void {
+    try {
+      // Kill the entire process group (negative pid)
+      process.kill(-pid, signal);
+    } catch {
+      // Process group kill failed, try direct kill
+      try { process.kill(pid, signal); } catch {}
+    }
+  }
+
+  private killPortHolder(): void {
+    try {
+      const pids = execSync(`lsof -t -i :${this.port}`, { encoding: 'utf-8' }).trim();
+      if (pids) {
+        for (const pid of pids.split('\n')) {
+          try { process.kill(Number(pid), 'SIGKILL'); } catch {}
+        }
+        console.log(`[${this.label}] Killed stale process(es) on port ${this.port}`);
+      }
+    } catch {}
+  }
+
+  private startStatic(appDir: string, startFile: string): void {
+    const app = express();
+    app.use(express.static(appDir));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(appDir, startFile));
+    });
+    this.staticServer = createServer(app);
+    this.staticServer.listen(this.port, () => {
+      console.log(`[${this.label}] Static server on port ${this.port}`);
+    });
+  }
+}

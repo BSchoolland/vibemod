@@ -1,13 +1,10 @@
 import { Router, type Request, type Response } from 'express';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs/promises';
 import { config } from '../config.js';
 import { mergeBranch } from '../lib/git.js';
-import { detectAdapter } from '../lib/adapters.js';
+import { deployLive } from '../lib/bootstrap.js';
 import { getActiveDraft } from './drafts.js';
 
-const execAsync = promisify(exec);
 export const publishRouter = Router();
 
 publishRouter.post('/', async (_req: Request, res: Response) => {
@@ -26,31 +23,6 @@ publishRouter.post('/', async (_req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-async function deployLive(): Promise<void> {
-  const livePath = config.liveClonePath;
-
-  const exists = await fs.access(livePath).then(() => true).catch(() => false);
-  if (!exists) {
-    await execAsync(`git clone ${config.appRepoPath} ${livePath}`);
-  }
-
-  await execAsync('git pull origin main', { cwd: livePath });
-
-  const adapter = await detectAdapter(livePath);
-  if (!adapter) {
-    throw new Error('Could not detect app type in live clone');
-  }
-
-  if (adapter.install) {
-    await execAsync(adapter.install, { cwd: livePath });
-  }
-  if (adapter.build) {
-    await execAsync(adapter.build, { cwd: livePath });
-  }
-
-  console.log('[publish] Live deployment complete. Restart live server process.');
-}
 
 publishRouter.get('/status', async (_req: Request, res: Response) => {
   try {

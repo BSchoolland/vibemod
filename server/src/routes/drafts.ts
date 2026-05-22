@@ -1,15 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import path from 'path';
 import fs from 'fs/promises';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { config } from '../config.js';
 import { createWorktree, removeWorktree, listWorktrees } from '../lib/git.js';
-import { detectAdapter } from '../lib/adapters.js';
-import { startPreview, stopPreview } from '../lib/preview.js';
+import { installAndBuild } from '../lib/deploy.js';
+import { previewServer } from '../lib/servers.js';
 import type { Draft } from '../types.js';
 
-const execAsync = promisify(exec);
 export const draftsRouter = Router();
 
 let activeDraft: Draft | null = null;
@@ -37,21 +34,9 @@ draftsRouter.post('/', async (req: Request, res: Response) => {
     await fs.mkdir(path.dirname(worktreePath), { recursive: true });
     await createWorktree(config.appRepoPath, branchName, worktreePath);
 
-    const adapter = await detectAdapter(worktreePath);
-    if (!adapter) {
-      res.status(400).json({ error: 'Could not detect app type' });
-      return;
-    }
-
-    if (adapter.install) {
-      await execAsync(adapter.install, { cwd: worktreePath });
-    }
-    if (adapter.build) {
-      await execAsync(adapter.build, { cwd: worktreePath });
-    }
-
+    const adapter = await installAndBuild(worktreePath);
     activeDraft = { name, branch: branchName, path: worktreePath, adapter };
-    startPreview(worktreePath, adapter);
+    previewServer.start(worktreePath, adapter);
 
     res.json({ draft: activeDraft });
   } catch (err: any) {
@@ -65,7 +50,7 @@ draftsRouter.delete('/:name', async (req: Request<{ name: string }>, res: Respon
     const worktreePath = path.join(config.appRepoPath, '..', 'worktrees', name);
 
     if (activeDraft?.name === name) {
-      stopPreview();
+      previewServer.stop();
       activeDraft = null;
     }
 
@@ -81,21 +66,9 @@ draftsRouter.post('/:name/rebuild', async (req: Request<{ name: string }>, res: 
     const { name } = req.params;
     const worktreePath = path.join(config.appRepoPath, '..', 'worktrees', name);
 
-    const adapter = await detectAdapter(worktreePath);
-    if (!adapter) {
-      res.status(400).json({ error: 'Could not detect app type' });
-      return;
-    }
-
-    if (adapter.install) {
-      await execAsync(adapter.install, { cwd: worktreePath });
-    }
-    if (adapter.build) {
-      await execAsync(adapter.build, { cwd: worktreePath });
-    }
-
-    stopPreview();
-    startPreview(worktreePath, adapter);
+    const adapter = await installAndBuild(worktreePath);
+    previewServer.stop();
+    previewServer.start(worktreePath, adapter);
 
     if (activeDraft?.name === name) {
       activeDraft.adapter = adapter;
