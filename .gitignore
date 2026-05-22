@@ -1,0 +1,8 @@
+node_modules/
+dist/
+app-repo/
+app-live/
+worktrees/
+*.log
+.env
+data.json
