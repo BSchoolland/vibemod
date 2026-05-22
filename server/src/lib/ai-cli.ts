@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { config } from '../config.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('ai-cli');
 
 export function runAiCli(
   prompt: string,
@@ -9,6 +12,8 @@ export function runAiCli(
 ): ChildProcess {
   const args = config.aiCliArgs.split(' ').filter(Boolean);
   args.push(prompt);
+
+  log.info({ cwd, cli: config.aiCli }, 'starting');
 
   const proc = spawn(config.aiCli, args, {
     cwd,
@@ -31,10 +36,12 @@ export function runAiCli(
   });
 
   proc.on('close', (code) => {
+    log.info({ exitCode: code ?? 1, outputLength: fullOutput.length }, 'finished');
     onDone(code ?? 1, fullOutput);
   });
 
   proc.on('error', (err) => {
+    log.error({ err }, 'failed to start');
     onDone(1, `Failed to start AI CLI: ${err.message}`);
   });
 

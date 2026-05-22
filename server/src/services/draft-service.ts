@@ -5,7 +5,11 @@ import { config } from '../config.js';
 import { createWorktree, removeWorktree, listWorktrees } from '../lib/git.js';
 import { previewServer } from '../lib/servers.js';
 import { buildService } from './build-service.js';
+import { createLogger } from '../lib/logger.js';
+import { annotate, time } from '../lib/request-context.js';
 import type { AppAdapter } from '../types.js';
+
+const log = createLogger('draft-service');
 
 export interface DraftRow {
   id: number;
@@ -49,17 +53,19 @@ class DraftService {
     const branchName = `draft/${draftName}`;
     const worktreePath = path.join(config.appRepoPath, '..', 'worktrees', draftName);
 
-    await fs.mkdir(path.dirname(worktreePath), { recursive: true });
-    await createWorktree(config.appRepoPath, branchName, worktreePath);
+    annotate({ draftName, branchName });
 
-    const adapter = await buildService.installAndBuild(worktreePath);
-    const { id: adapterId, json: adapterJson } = adapterToDb(adapter);
+    await fs.mkdir(path.dirname(worktreePath), { recursive: true });
+    await time('worktree', () => createWorktree(config.appRepoPath, branchName, worktreePath));
+
+    const adapter = await time('build', () => buildService.installAndBuild(worktreePath));
+    annotate({ adapterId: adapter.id, adapterName: adapter.name });
 
     db.prepare('UPDATE drafts SET is_active = 0 WHERE is_active = 1').run();
 
     const result = db.prepare(
       'INSERT INTO drafts (name, branch, path, adapter_id, adapter_json, is_active) VALUES (?, ?, ?, ?, ?, 1)'
-    ).run(draftName, branchName, worktreePath, adapterId, adapterJson);
+    ).run(draftName, branchName, worktreePath, ...Object.values(adapterToDb(adapter)));
 
     await previewServer.start(worktreePath, adapter);
 
@@ -103,7 +109,7 @@ class DraftService {
     if (!active?.adapter) return;
 
     if (!previewServer.running) {
-      console.log(`[draft-service] Restoring preview for "${active.name}"`);
+      log.info({ draftName: active.name }, 'restoring preview');
       await previewServer.start(active.path, active.adapter);
     }
   }

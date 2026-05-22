@@ -1,41 +1,34 @@
-import { Router, type Request, type Response } from 'express';
+import { Router } from 'express';
 import { draftService } from '../services/draft-service.js';
+import { route, annotate } from '../lib/request-context.js';
 
 export const draftsRouter = Router();
 
-draftsRouter.get('/', (_req: Request, res: Response) => {
-  try {
-    const drafts = draftService.list();
-    const active = draftService.getActive();
-    res.json({ drafts, active });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+draftsRouter.get('/', route((_req, res) => {
+  const drafts = draftService.list();
+  const active = draftService.getActive();
+  annotate({ draftCount: drafts.length, activeDraft: active?.name ?? null });
+  res.json({ drafts, active });
+}));
 
-draftsRouter.post('/', async (req: Request, res: Response) => {
-  try {
-    const draft = await draftService.create(req.body.name);
-    res.json({ draft });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+draftsRouter.post('/', route(async (req, res) => {
+  annotate({ requestedName: req.body.name ?? null });
+  const draft = await draftService.create(req.body.name);
+  annotate({ draftId: draft.id, draftName: draft.name });
+  res.json({ draft });
+}));
 
-draftsRouter.delete('/:name', async (req: Request<{ name: string }>, res: Response) => {
-  try {
-    await draftService.delete(req.params.name);
-    res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+draftsRouter.delete('/:name', route(async (req, res) => {
+  const name = req.params.name as string;
+  annotate({ draftName: name });
+  await draftService.delete(name);
+  res.json({ ok: true });
+}));
 
-draftsRouter.post('/:name/rebuild', async (req: Request<{ name: string }>, res: Response) => {
-  try {
-    const adapter = await draftService.rebuild(req.params.name);
-    res.json({ ok: true, adapter });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+draftsRouter.post('/:name/rebuild', route(async (req, res) => {
+  const name = req.params.name as string;
+  annotate({ draftName: name });
+  const adapter = await draftService.rebuild(name);
+  annotate({ adapterId: adapter.id });
+  res.json({ ok: true, adapter });
+}));

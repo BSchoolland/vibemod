@@ -3,6 +3,7 @@ import { createConnection } from 'net';
 import express from 'express';
 import { createServer, type Server } from 'http';
 import path from 'path';
+import { createLogger } from './logger.js';
 
 interface ManagedProcessOptions {
   label: string;
@@ -12,12 +13,14 @@ interface ManagedProcessOptions {
 export class ManagedProcess {
   private process: ChildProcess | null = null;
   private staticServer: Server | null = null;
+  private log;
   readonly label: string;
   readonly port: number;
 
   constructor({ label, port }: ManagedProcessOptions) {
     this.label = label;
     this.port = port;
+    this.log = createLogger(label);
   }
 
   async start(appDir: string, adapter: { start: string | null; dev: string | null; startFile: string | null }): Promise<void> {
@@ -43,22 +46,22 @@ export class ManagedProcess {
     });
 
     this.process.stdout!.on('data', (chunk: Buffer) => {
-      console.log(`[${this.label}] ${chunk.toString().trim()}`);
+      this.log.debug({ output: chunk.toString().trim() }, 'stdout');
     });
 
     this.process.stderr!.on('data', (chunk: Buffer) => {
-      console.error(`[${this.label}] ${chunk.toString().trim()}`);
+      this.log.warn({ output: chunk.toString().trim() }, 'stderr');
     });
 
     const spawned = this.process;
     spawned.on('close', (code) => {
-      console.log(`[${this.label}] process exited with code ${code}`);
+      this.log.info({ exitCode: code }, 'process exited');
       if (this.process === spawned) {
         this.process = null;
       }
     });
 
-    console.log(`[${this.label}] Server starting on port ${this.port} (pid ${this.process.pid})`);
+    this.log.info({ port: this.port, pid: this.process.pid, cmd: startCmd }, 'starting');
     await this.waitForPort();
   }
 
@@ -81,7 +84,7 @@ export class ManagedProcess {
         this.staticServer!.close(() => resolve());
       });
       this.staticServer = null;
-      console.log(`[${this.label}] Static server closed`);
+      this.log.info('static server closed');
       return;
     }
 
@@ -100,13 +103,13 @@ export class ManagedProcess {
     ]);
 
     if (!exited) {
-      console.log(`[${this.label}] Graceful shutdown timed out, sending SIGKILL`);
+      this.log.warn({ pid, timeoutMs }, 'graceful shutdown timed out, sending SIGKILL');
       this.killTree(pid, 'SIGKILL');
       this.killPortHolder();
     }
 
     this.process = null;
-    console.log(`[${this.label}] Stopped`);
+    this.log.info('stopped');
   }
 
   get running(): boolean {
@@ -115,10 +118,8 @@ export class ManagedProcess {
 
   private killTree(pid: number, signal: NodeJS.Signals = 'SIGKILL'): void {
     try {
-      // Kill the entire process group (negative pid)
       process.kill(-pid, signal);
     } catch {
-      // Process group kill failed, try direct kill
       try { process.kill(pid, signal); } catch {}
     }
   }
@@ -130,7 +131,7 @@ export class ManagedProcess {
         for (const pid of pids.split('\n')) {
           try { process.kill(Number(pid), 'SIGKILL'); } catch {}
         }
-        console.log(`[${this.label}] Killed stale process(es) on port ${this.port}`);
+        this.log.warn({ port: this.port, pids: pids.split('\n').map(Number) }, 'killed stale process(es)');
       }
     } catch {}
   }
@@ -144,7 +145,7 @@ export class ManagedProcess {
       });
       this.staticServer = createServer(app);
       this.staticServer.listen(this.port, () => {
-        console.log(`[${this.label}] Static server on port ${this.port}`);
+        this.log.info({ port: this.port, startFile }, 'static server ready');
         resolve();
       });
     });
@@ -158,7 +159,7 @@ export class ManagedProcess {
         sock.once('connect', () => {
           sock.destroy();
           if (Date.now() >= deadline) {
-            reject(new Error(`[${this.label}] Port ${this.port} still in use after ${timeoutMs}ms`));
+            reject(new Error(`Port ${this.port} still in use after ${timeoutMs}ms`));
           } else {
             setTimeout(check, intervalMs);
           }
@@ -177,19 +178,19 @@ export class ManagedProcess {
       const deadline = Date.now() + timeoutMs;
       const check = () => {
         if (!this.process) {
-          reject(new Error(`[${this.label}] Process exited before server became ready`));
+          reject(new Error('Process exited before server became ready'));
           return;
         }
         const sock = createConnection({ port: this.port, host: '127.0.0.1' });
         sock.once('connect', () => {
           sock.destroy();
-          console.log(`[${this.label}] Server ready on port ${this.port}`);
+          this.log.info({ port: this.port }, 'server ready');
           resolve();
         });
         sock.once('error', () => {
           sock.destroy();
           if (Date.now() >= deadline) {
-            reject(new Error(`[${this.label}] Timed out waiting for port ${this.port}`));
+            reject(new Error(`Timed out waiting for port ${this.port}`));
           } else {
             setTimeout(check, intervalMs);
           }

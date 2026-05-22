@@ -5,16 +5,18 @@ import { promisify } from 'util';
 import { config } from '../config.js';
 import { installAndBuild } from './deploy.js';
 import { liveServer } from './servers.js';
+import { createLogger } from './logger.js';
 
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
+const log = createLogger('bootstrap');
 
 export async function bootstrapAppRepo(seedPath: string): Promise<void> {
   const repoPath = config.appRepoPath;
 
   const exists = await fs.access(path.join(repoPath, '.git')).then(() => true).catch(() => false);
   if (!exists) {
-    console.log('[bootstrap] Initializing app repo from seed...');
+    log.info({ seedPath, repoPath }, 'initializing app repo from seed');
 
     await fs.mkdir(repoPath, { recursive: true });
     await execFileAsync('git', ['init'], { cwd: repoPath });
@@ -30,9 +32,9 @@ export async function bootstrapAppRepo(seedPath: string): Promise<void> {
     await execFileAsync('git', ['add', '-A'], { cwd: repoPath });
     await execFileAsync('git', ['commit', '-m', 'Initial commit'], { cwd: repoPath });
 
-    console.log('[bootstrap] App repo ready at', repoPath);
+    log.info({ repoPath }, 'app repo ready');
   } else {
-    console.log('[bootstrap] App repo already exists, skipping');
+    log.info({ repoPath }, 'app repo already exists');
   }
 
   await deployLive();
@@ -43,11 +45,11 @@ export async function deployLive(): Promise<void> {
 
   const exists = await fs.access(path.join(livePath, '.git')).then(() => true).catch(() => false);
   if (!exists) {
-    console.log('[live] Cloning app repo for live server...');
+    log.info({ livePath }, 'cloning app repo for live server');
     await execAsync(`git clone ${config.appRepoPath} ${livePath}`);
   } else {
     await execAsync('git pull', { cwd: livePath }).catch(() => {
-      console.log('[live] git pull failed, continuing with existing state');
+      log.warn({ livePath }, 'git pull failed, continuing with existing state');
     });
   }
 
