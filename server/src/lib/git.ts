@@ -11,7 +11,17 @@ function git(args: string[], cwd: string) {
 export async function createWorktree(repoPath: string, branchName: string, worktreePath: string, startPoint?: string): Promise<string> {
   const args = ['worktree', 'add', '-b', branchName, worktreePath];
   if (startPoint) args.push(startPoint);
-  await git(args, repoPath);
+  try {
+    await git(args, repoPath);
+  } catch (err: any) {
+    if (err.stderr?.includes('already exists')) {
+      await git(['worktree', 'prune'], repoPath);
+      await git(['branch', '-D', branchName], repoPath).catch(() => {});
+      await git(args, repoPath);
+    } else {
+      throw err;
+    }
+  }
   return worktreePath;
 }
 
