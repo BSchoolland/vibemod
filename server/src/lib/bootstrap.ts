@@ -19,9 +19,23 @@ export async function bootstrapAppRepo(seedPath: string): Promise<void> {
     await fs.mkdir(repoPath, { recursive: true });
     await execFileAsync('git', ['init'], { cwd: repoPath });
 
+    // Copy .gitignore first so we can use git check-ignore to filter
+    const gitignoreSrc = path.join(seedPath, '.gitignore');
+    const hasGitignore = await fs.access(gitignoreSrc).then(() => true).catch(() => false);
+    if (hasGitignore) {
+      await fs.cp(gitignoreSrc, path.join(repoPath, '.gitignore'));
+    }
+
     const entries = await fs.readdir(seedPath);
     for (const entry of entries) {
-      if (entry === 'node_modules' || entry === '.git') continue;
+      if (entry === 'node_modules' || entry === '.git' || entry === '.gitignore') continue;
+      const ignored = await execFileAsync('git', ['check-ignore', '-q', entry], { cwd: repoPath })
+        .then(() => true)
+        .catch(() => false);
+      if (ignored) {
+        log.info({ entry }, 'skipping gitignored entry from seed');
+        continue;
+      }
       const src = path.join(seedPath, entry);
       const dest = path.join(repoPath, entry);
       await fs.cp(src, dest, { recursive: true });

@@ -6,6 +6,7 @@ import { DraftSelector } from '@/components/DraftSelector';
 import { useChat } from '@/hooks/useChat';
 import { useDrafts } from '@/hooks/useDrafts';
 import { usePublish } from '@/hooks/usePublish';
+import { useDrawing } from '@/hooks/useDrawing';
 
 const PREVIEW_PORT = 3002;
 
@@ -24,6 +25,7 @@ function App() {
   const { drafts, activeDraft, isLoading, createDraft, activate, rebuild, refetch } = useDrafts();
   const { messages, toolEvents, sendMessage, isSending, isStreaming, isThinking, wsReady } = useChat(activeDraft?.id ?? null);
   const { state: publishState, publish, reset: publishReset } = usePublish(refetch);
+  const drawing = useDrawing();
 
   const wasSending = useRef(false);
   useEffect(() => {
@@ -75,8 +77,9 @@ function App() {
           isThinking={isThinking}
           wsReady={wsReady}
           activeDraft={activeDraft}
+          drawing={drawing}
         />
-        <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} isLoading={isLoading} isWorking={isSending} />
+        <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} isLoading={isLoading} isWorking={isSending} drawing={drawing} />
       </div>
     </div>
   );

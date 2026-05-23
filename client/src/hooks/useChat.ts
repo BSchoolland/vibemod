@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import type { DrawingPayload } from './useDrawing';
 
 export interface ChatMessage {
   id: number;
@@ -158,9 +159,10 @@ export function useChat(draftId: number | null) {
     return data.conversation;
   }, [conversation]);
 
-  const sendMessage = useCallback(async (content: string): Promise<void> => {
+  const sendMessage = useCallback(async (content: string, drawing?: DrawingPayload): Promise<void> => {
     console.log('[useChat] sendMessage called', {
       content,
+      hasDrawing: !!drawing,
       draftId,
       hasWs: !!wsRef.current,
       readyState: wsRef.current?.readyState,
@@ -199,8 +201,9 @@ export function useChat(draftId: number | null) {
       created_at: new Date().toISOString(),
     }]);
 
-    const payload = { type: 'send_message', conversationId: convo.id, content };
-    console.log('[useChat] sending WS message', payload);
+    const payload: Record<string, unknown> = { type: 'send_message', conversationId: convo.id, content };
+    if (drawing) payload.drawing = drawing;
+    console.log('[useChat] sending WS message', { ...payload, drawing: drawing ? '[png]' : undefined });
     wsRef.current.send(JSON.stringify(payload));
   }, [draftId, ensureConversation, wsReady]);
 

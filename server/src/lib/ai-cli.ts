@@ -21,6 +21,7 @@ export function runAiCli(
   prompt: string,
   cwd: string,
   callbacks: AiCliCallbacks,
+  attachments: string[] = [],
 ): ChildProcess {
   const args = [
     '--provider', 'google',
@@ -29,6 +30,7 @@ export function runAiCli(
     '--no-session',
     '--no-context-files',
     '-p', prompt,
+    ...attachments.map((p) => `@${p}`),
   ];
 
   log.info({ cwd, cli: config.aiCli }, 'starting');

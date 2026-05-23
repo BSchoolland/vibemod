@@ -2,9 +2,16 @@ import { type ChildProcess } from 'child_process';
 import { db } from '../lib/db.js';
 import { runAiCli, type ToolEvent } from '../lib/ai-cli.js';
 import { draftService } from './draft-service.js';
+import { screenshotService } from './screenshot-service.js';
 import { generateBranchName } from '../lib/gemini.js';
 import { config } from '../config.js';
 import { createLogger } from '../lib/logger.js';
+
+export interface DrawingInput {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
 
 const log = createLogger('chat-service');
 
@@ -68,11 +75,12 @@ class ChatService {
       .get(id) as ConversationRow | undefined;
   }
 
-  streamMessage(
+  async streamMessage(
     conversationId: number,
     content: string,
     callbacks: StreamCallbacks,
-  ): ChildProcess {
+    drawing?: DrawingInput,
+  ): Promise<ChildProcess> {
     const conversation = this.getConversation(conversationId);
     if (!conversation) throw new Error('Conversation not found');
 
@@ -81,7 +89,8 @@ class ChatService {
       throw new Error('Conversation does not belong to the active draft');
     }
 
-    this.addMessage(conversationId, 'user', content);
+    const storedContent = drawing ? `${content}\n\n[annotated screenshot attached]` : content;
+    this.addMessage(conversationId, 'user', storedContent);
 
     if (!draft.display_name && config.geminiApiKey) {
       generateBranchName(content)
@@ -89,7 +98,25 @@ class ChatService {
         .catch((err) => log.warn({ err: err.message }, 'branch naming failed'));
     }
 
-    const proc = runAiCli(content, draft.path, {
+    const attachments: string[] = [];
+    let prompt = content;
+    if (drawing) {
+      try {
+        const screenshotPath = await screenshotService.captureWithOverlay(
+          config.previewPort,
+          drawing.dataUrl,
+          drawing.width,
+          drawing.height,
+        );
+        attachments.push(screenshotPath);
+        prompt = `${content}\n\nThe attached image shows the current preview of the app with the user's pink-ink annotation drawn on top. Use the annotation to understand which element(s) they're pointing at.`;
+      } catch (err: any) {
+        log.error({ err: err.message }, 'failed to capture annotated screenshot');
+        prompt = `${content}\n\n(The user tried to attach an annotated screenshot but capture failed: ${err.message}.)`;
+      }
+    }
+
+    const proc = runAiCli(prompt, draft.path, {
       onText: (chunk) => callbacks.onChunk(chunk),
       onTool: (event) => callbacks.onTool(event),
       onThinking: (thinking) => callbacks.onThinking(thinking),
@@ -110,7 +137,7 @@ class ChatService {
           callbacks.onError(`Rebuild failed: ${err.message}`);
         }
       },
-    });
+    }, attachments);
 
     return proc;
   }

@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, FileText, Terminal, Search, FolderOpen, Pencil, Loader2, Check } from 'lucide-react';
+import { Send, Sparkles, FileText, Terminal, Search, FolderOpen, Pencil, Loader2, Check, X } from 'lucide-react';
 import type { ChatMessage, ToolEvent } from '@/hooks/useChat';
 import type { Draft } from '@/hooks/useDrafts';
+import type { UseDrawing, DrawingPayload } from '@/hooks/useDrawing';
 
 interface ChatSidebarProps {
   messages: ChatMessage[];
   toolEvents: ToolEvent[];
-  onSend: (content: string) => void;
+  onSend: (content: string, drawing?: DrawingPayload) => void;
   isSending: boolean;
   isStreaming: boolean;
   isThinking: boolean;
   wsReady: boolean;
   activeDraft: Draft | null;
+  drawing: UseDrawing;
 }
 
 const TOOL_CONFIG: Record<string, { icon: typeof FileText; color: string; label: string }> = {
@@ -100,7 +102,7 @@ function MessageBubble({ message, isStreamingMsg }: { message: ChatMessage; isSt
   );
 }
 
-export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreaming, isThinking, wsReady, activeDraft }: ChatSidebarProps) {
+export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreaming, isThinking, wsReady, activeDraft, drawing }: ChatSidebarProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -112,10 +114,12 @@ export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreami
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[ChatSidebar] submit', { input, isSending, wsReady, activeDraft: activeDraft?.id });
-    if (!input.trim() || isSending) return;
-    onSend(input.trim());
+    if ((!input.trim() && !drawing.hasDrawing) || isSending) return;
+    const payload = drawing.getDrawing() ?? undefined;
+    onSend(input.trim() || 'See annotated screenshot.', payload);
     setInput('');
+    drawing.clear();
+    drawing.setDrawMode(false);
   };
 
   const showThinking = isThinking && toolEvents.length === 0 && !isStreaming;
@@ -160,8 +164,35 @@ export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreami
         {showThinking && <ThinkingIndicator />}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-3 border-t border-border/50">
+      <form onSubmit={handleSubmit} className="p-3 border-t border-border/50 space-y-2">
+        {drawing.hasDrawing && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neon-pink/10 border border-neon-pink/30 text-xs">
+            <Pencil className="w-3.5 h-3.5 text-neon-pink shrink-0" />
+            <span className="text-neon-pink flex-1">Annotation attached — sent with screenshot</span>
+            <button
+              type="button"
+              onClick={drawing.clear}
+              className="text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+              title="Clear drawing"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-1 border border-border/30">
+          <button
+            type="button"
+            onClick={drawing.toggleDraw}
+            disabled={!activeDraft}
+            title={drawing.drawMode ? 'Stop drawing' : 'Draw on the preview to point things out'}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all disabled:opacity-20 disabled:cursor-default ${
+              drawing.drawMode
+                ? 'bg-neon-pink/20 text-neon-pink ring-1 ring-neon-pink/50'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'
+            }`}
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -171,7 +202,7 @@ export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreami
           />
           <button
             type="submit"
-            disabled={!activeDraft || !wsReady || isSending || !input.trim()}
+            disabled={!activeDraft || !wsReady || isSending || (!input.trim() && !drawing.hasDrawing)}
             className="w-9 h-9 rounded-xl bg-gradient-send text-white flex items-center justify-center disabled:opacity-20 hover:opacity-90 transition-all shrink-0 cursor-pointer disabled:cursor-default glow-send disabled:shadow-none"
           >
             <Send className="w-4 h-4" />

@@ -77,6 +77,46 @@ class ScreenshotService {
     }
   }
 
+  async captureWithOverlay(
+    port: number,
+    overlayPngDataUrl: string,
+    width: number,
+    height: number,
+  ): Promise<string> {
+    await this.ensureDir();
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+
+    try {
+      await page.setViewport({ width, height });
+      await page.goto(`http://localhost:${port}`, {
+        waitUntil: 'networkidle2',
+        timeout: 15000,
+      });
+
+      await page.evaluate((dataUrl) => {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.setAttribute('style',
+          'position:fixed;inset:0;width:100vw;height:100vh;' +
+          'pointer-events:none;z-index:2147483647;'
+        );
+        document.body.appendChild(img);
+        return new Promise<void>((resolve) => {
+          if (img.complete) resolve();
+          else img.onload = () => resolve();
+        });
+      }, overlayPngDataUrl);
+
+      const outputPath = path.join(SCREENSHOTS_DIR, `annotated-${Date.now()}.png`);
+      await page.screenshot({ path: outputPath, type: 'png' });
+      log.info({ outputPath, port }, 'annotated screenshot captured');
+      return outputPath;
+    } finally {
+      await page.close();
+    }
+  }
+
   async shutdown(): Promise<void> {
     if (this.browser) {
       await this.browser.close();

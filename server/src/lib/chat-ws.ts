@@ -10,6 +10,7 @@ interface SendMessagePayload {
   type: 'send_message';
   conversationId: number;
   content: string;
+  drawing?: { dataUrl: string; width: number; height: number };
 }
 
 interface CancelPayload {
@@ -30,6 +31,7 @@ export function attachChatWs(server: Server) {
   wss.on('connection', (ws) => {
     log.info('client connected');
     let activeProc: ChildProcess | null = null;
+    let busy = false;
 
     ws.on('message', (raw) => {
       let msg: ClientMessage;
@@ -47,50 +49,56 @@ export function attachChatWs(server: Server) {
           activeProc.kill('SIGTERM');
           activeProc = null;
         }
+        busy = false;
         return;
       }
 
       if (msg.type === 'send_message') {
-        if (activeProc) {
+        if (busy) {
           send(ws, { type: 'error', error: 'A message is already in progress' });
           return;
         }
+        busy = true;
 
-        log.info({ conversationId: msg.conversationId }, 'starting stream');
+        log.info({ conversationId: msg.conversationId, hasDrawing: !!msg.drawing }, 'starting stream');
 
-        try {
-          activeProc = chatService.streamMessage(
-            msg.conversationId,
-            msg.content,
-            {
-              onChunk: (content) => send(ws, { type: 'chunk', content }),
-              onTool: (event) => send(ws, { ...event }),
-              onThinking: (thinking) => send(ws, { type: 'thinking', thinking }),
-              onAiMessage: (message) => {
-                activeProc = null;
-                log.info({ messageId: message.id }, 'ai done');
-                send(ws, { type: 'ai_done', message });
-              },
-              onRebuildComplete: () => {
-                log.info('rebuild complete');
-                send(ws, { type: 'rebuild_complete' });
-              },
-              onError: (error) => {
-                log.error({ error }, 'stream error');
-                send(ws, { type: 'error', error });
-              },
+        chatService.streamMessage(
+          msg.conversationId,
+          msg.content,
+          {
+            onChunk: (content) => send(ws, { type: 'chunk', content }),
+            onTool: (event) => send(ws, { ...event }),
+            onThinking: (thinking) => send(ws, { type: 'thinking', thinking }),
+            onAiMessage: (message) => {
+              activeProc = null;
+              busy = false;
+              log.info({ messageId: message.id }, 'ai done');
+              send(ws, { type: 'ai_done', message });
             },
-          );
-
-          activeProc.on('error', (err) => {
+            onRebuildComplete: () => {
+              log.info('rebuild complete');
+              send(ws, { type: 'rebuild_complete' });
+            },
+            onError: (error) => {
+              log.error({ error }, 'stream error');
+              busy = false;
+              send(ws, { type: 'error', error });
+            },
+          },
+          msg.drawing,
+        ).then((proc) => {
+          activeProc = proc;
+          proc.on('error', (err) => {
             log.error({ err: err.message }, 'process error');
             activeProc = null;
+            busy = false;
           });
-        } catch (err: any) {
+        }).catch((err: any) => {
           log.error({ err: err.message }, 'streamMessage threw');
           activeProc = null;
+          busy = false;
           send(ws, { type: 'error', error: err.message });
-        }
+        });
         return;
       }
 

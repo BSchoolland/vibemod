@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Globe, Loader2 } from 'lucide-react';
 import type { Draft } from '@/hooks/useDrafts';
+import type { UseDrawing } from '@/hooks/useDrawing';
 
 interface PreviewPaneProps {
   activeDraft: Draft | null;
   previewPort: number;
   isLoading?: boolean;
   isWorking?: boolean;
+  drawing: UseDrawing;
 }
 
-export function PreviewPane({ activeDraft, previewPort, isLoading, isWorking }: PreviewPaneProps) {
+export function PreviewPane({ activeDraft, previewPort, isLoading, isWorking, drawing }: PreviewPaneProps) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const showSpinner = isLoading || (activeDraft && !iframeLoaded);
 
@@ -59,6 +61,15 @@ export function PreviewPane({ activeDraft, previewPort, isLoading, isWorking }: 
             className="absolute inset-0 w-full h-full border-0"
             title="Preview"
             onLoad={() => setIframeLoaded(true)}
+          />
+          <canvas
+            {...drawing.canvasProps}
+            className="absolute inset-0 w-full h-full z-20"
+            style={{
+              pointerEvents: drawing.drawMode ? 'auto' : 'none',
+              cursor: drawing.drawMode ? 'crosshair' : 'default',
+              touchAction: drawing.drawMode ? 'none' : 'auto',
+            }}
           />
         </div>
       </div>
