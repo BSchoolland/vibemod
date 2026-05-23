@@ -7,7 +7,7 @@ import { chatRouter } from './routes/chat.js';
 import { publishRouter } from './routes/publish.js';
 import { bootstrapAppRepo } from './lib/bootstrap.js';
 import { registerShutdown } from './lib/shutdown.js';
-import { draftService } from './services/draft-service.js';
+import { serverManager } from './services/server-manager.js';
 import { config } from './config.js';
 import { createLogger } from './lib/logger.js';
 import { requestLogger, errorHandler } from './lib/request-context.js';
@@ -51,7 +51,7 @@ app.use(errorHandler);
 registerShutdown(server);
 
 bootstrapAppRepo(config.seedPath).then(async () => {
-  await draftService.restoreServers();
+  await serverManager.restoreServers();
   server.listen(config.port, () => {
     log.info({ port: config.port }, 'server started');
   });
