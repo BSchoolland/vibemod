@@ -7,6 +7,7 @@ import { chatRouter } from './routes/chat.js';
 import { publishRouter } from './routes/publish.js';
 import { bootstrapAppRepo } from './lib/bootstrap.js';
 import { registerShutdown } from './lib/shutdown.js';
+import { attachChatWs } from './lib/chat-ws.js';
 import { serverManager } from './services/server-manager.js';
 import { config } from './config.js';
 import { createLogger } from './lib/logger.js';
@@ -49,6 +50,7 @@ app.get('/api/health', (_req, res) => {
 app.use(errorHandler);
 
 registerShutdown(server);
+attachChatWs(server);
 
 bootstrapAppRepo(config.seedPath).then(async () => {
   await serverManager.restoreServers();

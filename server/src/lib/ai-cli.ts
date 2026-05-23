@@ -4,51 +4,106 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('ai-cli');
 
+export interface ToolEvent {
+  type: 'tool_start' | 'tool_end';
+  toolName: string;
+  args?: Record<string, unknown>;
+}
+
+export interface AiCliCallbacks {
+  onText: (chunk: string) => void;
+  onTool: (event: ToolEvent) => void;
+  onThinking: (thinking: string) => void;
+  onDone: (code: number, fullText: string) => void;
+}
+
 export function runAiCli(
   prompt: string,
   cwd: string,
-  onData: (chunk: string) => void,
-  onDone: (code: number, fullOutput: string) => void,
+  callbacks: AiCliCallbacks,
 ): ChildProcess {
-  const cliArgs = config.aiCliArgs.split(' ').filter(Boolean);
-  const pIndex = cliArgs.indexOf('-p');
-  if (pIndex !== -1) {
-    cliArgs.splice(pIndex + 1, 0, prompt);
-  } else {
-    cliArgs.push('-p', prompt);
-  }
-  const args = [...cliArgs, '--add-dir', cwd];
+  const args = [
+    '--provider', 'google',
+    '--model', 'gemini-3.5-flash',
+    '--mode', 'json',
+    '--no-session',
+    '--no-context-files',
+    '-p', prompt,
+  ];
 
   log.info({ cwd, cli: config.aiCli }, 'starting');
 
   const proc = spawn(config.aiCli, args, {
     cwd,
-    env: { ...process.env },
+    env: { ...process.env, GEMINI_API_KEY: config.geminiApiKey },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  let fullOutput = '';
+  let fullText = '';
+  let lineBuf = '';
+
+  const processLine = (line: string) => {
+    if (!line.trim()) return;
+    let event: any;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      return;
+    }
+
+    switch (event.type) {
+      case 'tool_execution_start':
+        callbacks.onTool({
+          type: 'tool_start',
+          toolName: event.toolName,
+          args: event.args,
+        });
+        break;
+
+      case 'tool_execution_end':
+        callbacks.onTool({
+          type: 'tool_end',
+          toolName: event.toolName,
+        });
+        break;
+
+      case 'message_update': {
+        const ae = event.assistantMessageEvent;
+        if (!ae) break;
+        if (ae.type === 'text_delta' && ae.delta) {
+          fullText += ae.delta;
+          callbacks.onText(ae.delta);
+        }
+        if (ae.type === 'thinking_start' && ae.partial?.content?.[0]?.thinking) {
+          callbacks.onThinking(ae.partial.content[0].thinking);
+        }
+        break;
+      }
+    }
+  };
 
   proc.stdout!.on('data', (chunk: Buffer) => {
-    const text = chunk.toString();
-    fullOutput += text;
-    onData(text);
+    lineBuf += chunk.toString();
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop()!;
+    for (const line of lines) {
+      processLine(line);
+    }
   });
 
   proc.stderr!.on('data', (chunk: Buffer) => {
-    const text = chunk.toString();
-    fullOutput += text;
-    onData(text);
+    log.warn({ stderr: chunk.toString().trim() }, 'stderr');
   });
 
   proc.on('close', (code) => {
-    log.info({ exitCode: code ?? 1, outputLength: fullOutput.length }, 'finished');
-    onDone(code ?? 1, fullOutput);
+    if (lineBuf.trim()) processLine(lineBuf);
+    log.info({ exitCode: code ?? 1, outputLength: fullText.length }, 'finished');
+    callbacks.onDone(code ?? 1, fullText);
   });
 
   proc.on('error', (err) => {
     log.error({ err }, 'failed to start');
-    onDone(1, `Failed to start AI CLI: ${err.message}`);
+    callbacks.onDone(1, `Failed to start AI CLI: ${err.message}`);
   });
 
   return proc;

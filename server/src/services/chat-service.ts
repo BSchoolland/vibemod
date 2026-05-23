@@ -1,7 +1,7 @@
+import { type ChildProcess } from 'child_process';
 import { db } from '../lib/db.js';
-import { runAiCli } from '../lib/ai-cli.js';
+import { runAiCli, type ToolEvent } from '../lib/ai-cli.js';
 import { draftService } from './draft-service.js';
-import { annotate, time } from '../lib/request-context.js';
 import { generateBranchName } from '../lib/gemini.js';
 import { config } from '../config.js';
 import { createLogger } from '../lib/logger.js';
@@ -21,6 +21,15 @@ export interface ConversationRow {
   draft_id: number;
   title: string | null;
   created_at: string;
+}
+
+export interface StreamCallbacks {
+  onChunk: (content: string) => void;
+  onTool: (event: ToolEvent) => void;
+  onThinking: (thinking: string) => void;
+  onAiMessage: (message: MessageRow) => void;
+  onRebuildComplete: () => void;
+  onError: (error: string) => void;
 }
 
 class ChatService {
@@ -54,17 +63,23 @@ class ChatService {
       .get(result.lastInsertRowid) as MessageRow;
   }
 
-  async sendMessage(conversationId: number, content: string): Promise<MessageRow> {
-    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?')
-      .get(conversationId) as ConversationRow | undefined;
+  getConversation(id: number): ConversationRow | undefined {
+    return db.prepare('SELECT * FROM conversations WHERE id = ?')
+      .get(id) as ConversationRow | undefined;
+  }
+
+  streamMessage(
+    conversationId: number,
+    content: string,
+    callbacks: StreamCallbacks,
+  ): ChildProcess {
+    const conversation = this.getConversation(conversationId);
     if (!conversation) throw new Error('Conversation not found');
 
     const draft = draftService.getActive();
     if (!draft || draft.id !== conversation.draft_id) {
       throw new Error('Conversation does not belong to the active draft');
     }
-
-    annotate({ draftId: draft.id, draftName: draft.name });
 
     this.addMessage(conversationId, 'user', content);
 
@@ -74,31 +89,30 @@ class ChatService {
         .catch((err) => log.warn({ err: err.message }, 'branch naming failed'));
     }
 
-    const aiResponse = await time('aiCli', () =>
-      new Promise<{ code: number; output: string }>((resolve) => {
-        runAiCli(
-          content,
-          draft.path,
-          () => {},
-          (code, fullOutput) => resolve({ code, output: fullOutput }),
-        );
-      })
-    );
+    const proc = runAiCli(content, draft.path, {
+      onText: (chunk) => callbacks.onChunk(chunk),
+      onTool: (event) => callbacks.onTool(event),
+      onThinking: (thinking) => callbacks.onThinking(thinking),
+      onDone: async (code, fullText) => {
+        const aiMessage = this.addMessage(conversationId, 'ai', fullText);
+        callbacks.onAiMessage(aiMessage);
 
-    annotate({ aiCliExitCode: aiResponse.code });
+        if (code !== 0) {
+          callbacks.onRebuildComplete();
+          return;
+        }
 
-    const aiMessage = this.addMessage(conversationId, 'ai', aiResponse.output);
+        try {
+          await draftService.rebuild(draft.name);
+          callbacks.onRebuildComplete();
+        } catch (err: any) {
+          this.addMessage(conversationId, 'system', `Rebuild failed: ${err.message}`);
+          callbacks.onError(`Rebuild failed: ${err.message}`);
+        }
+      },
+    });
 
-    if (aiResponse.code === 0) {
-      try {
-        await time('rebuild', () => draftService.rebuild(draft.name));
-      } catch (err: any) {
-        annotate({ rebuildError: err.message });
-        this.addMessage(conversationId, 'system', `Rebuild failed: ${err.message}`);
-      }
-    }
-
-    return aiMessage;
+    return proc;
   }
 }
 

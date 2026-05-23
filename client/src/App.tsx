@@ -22,7 +22,7 @@ function Logo() {
 
 function App() {
   const { drafts, activeDraft, isLoading, createDraft, activate, rebuild, refetch } = useDrafts();
-  const { messages, sendMessage, isSending } = useChat(activeDraft?.id ?? null);
+  const { messages, toolEvents, sendMessage, isSending, isStreaming, isThinking, wsReady } = useChat(activeDraft?.id ?? null);
   const { state: publishState, publish, reset: publishReset } = usePublish(refetch);
 
   const wasSending = useRef(false);
@@ -68,8 +68,12 @@ function App() {
       <div className="flex flex-1 min-h-0 p-3 gap-3">
         <ChatSidebar
           messages={messages}
+          toolEvents={toolEvents}
           onSend={sendMessage}
           isSending={isSending}
+          isStreaming={isStreaming}
+          isThinking={isThinking}
+          wsReady={wsReady}
           activeDraft={activeDraft}
         />
         <PreviewPane activeDraft={activeDraft} previewPort={PREVIEW_PORT} isLoading={isLoading} isWorking={isSending} />

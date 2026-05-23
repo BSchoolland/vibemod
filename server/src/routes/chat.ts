@@ -36,11 +36,3 @@ chatRouter.get('/conversations/:id/messages', route((req, res) => {
   annotate({ messageCount: messages.length });
   res.json({ messages });
 }));
-
-chatRouter.post('/conversations/:id/messages', route(async (req, res) => {
-  const conversationId = Number(req.params.id);
-  annotate({ conversationId });
-  const aiMessage = await chatService.sendMessage(conversationId, req.body.content);
-  annotate({ aiMessageId: aiMessage.id });
-  res.json({ message: aiMessage });
-}));
