@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibemod - Option 2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+  .slide {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 10vw;
+    text-align: center;
+  }
+  .slide.active { display: flex; }
+
+  .slide:nth-child(1) { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; }
+  .slide:nth-child(2) { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; }
+  .slide:nth-child(3) { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #fff; }
+  .slide:nth-child(4) { background: linear-gradient(135deg, #000428, #004e92); color: #fff; }
+  .slide:nth-child(5) { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; }
+
+  h1 { font-size: 5.5vw; font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: 3.8vw; font-weight: 700; margin-bottom: 2rem; }
+  .subtitle { font-size: 2.2vw; opacity: 0.7; margin-top: 1rem; max-width: 60vw; line-height: 1.6; }
+  p { font-size: 2vw; line-height: 1.8; opacity: 0.85; max-width: 60vw; }
+
+  .steps {
+    display: flex;
+    gap: 4vw;
+    margin-top: 2rem;
+  }
+  .step { text-align: center; }
+  .step-num {
+    font-size: 3vw;
+    font-weight: 800;
+    opacity: 0.3;
+  }
+  .step-label {
+    font-size: 1.8vw;
+    margin-top: 0.5rem;
+    opacity: 0.9;
+  }
+
+  .nav {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.6rem;
+    z-index: 10;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+  }
+  .dot.active { background: #fff; transform: scale(1.3); }
+</style>
+</head>
+<body>
+
+<div class="slide active">
+  <h1>Vibemod</h1>
+  <div class="subtitle">Finally add that feature you always wanted — to the software you already use every day.</div>
+</div>
+
+<div class="slide">
+  <h2>You Know What's Missing</h2>
+  <p>You're not a developer. But you know your tools better than anyone. Vibemod lets you change them by just saying what you want.</p>
+</div>
+
+<div class="slide">
+  <h2>How It Works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-label">Open your app</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-label">Describe the change</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-label">Watch it happen</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-label">Keep it</div>
+    </div>
+  </div>
+</div>
+
+<div class="slide">
+  <h2>Live Demo</h2>
+  <p>Let's add a feature to a real app, right now.</p>
+</div>
+
+<div class="slide">
+  <h1>Thanks!</h1>
+  <div class="subtitle">Questions?</div>
+</div>
+
+<div class="nav" id="nav"></div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const nav = document.getElementById('nav');
+
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dot.onclick = () => show(i);
+    nav.appendChild(dot);
+  });
+
+  function show(i) {
+    slides[current].classList.remove('active');
+    nav.children[current].classList.remove('active');
+    current = Math.max(0, Math.min(i, slides.length - 1));
+    slides[current].classList.add('active');
+    nav.children[current].classList.add('active');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+    if (e.key === 'ArrowLeft') show(current - 1);
+  });
+</script>
+</body>
+</html>

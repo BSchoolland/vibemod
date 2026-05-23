@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibemod - Option 3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', -apple-system, Arial, sans-serif;
+    background: #fff;
+    color: #111;
+    overflow: hidden;
+  }
+  .slide {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10vw 12vw;
+  }
+  .slide.active { display: flex; }
+  .slide.centered { align-items: center; text-align: center; }
+
+  h1 {
+    font-size: 7vw;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  h2 {
+    font-size: 4.5vw;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  p {
+    font-size: 2.2vw;
+    line-height: 1.6;
+    color: #555;
+    margin-top: 1.5rem;
+    max-width: 55vw;
+  }
+  .highlight {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .inverted {
+    background: #111;
+    color: #fff;
+  }
+  .inverted p { color: #aaa; }
+
+  .pill-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-size: 1.6vw;
+    padding: 0.5em 1.2em;
+    border-radius: 999px;
+    border: 2px solid #e0e0e0;
+    color: #666;
+    font-weight: 500;
+  }
+  .inverted .pill { border-color: #333; color: #999; }
+
+  .nav {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 10;
+  }
+  .nav button {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    background: transparent;
+    color: #999;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .nav button:hover { border-color: #111; color: #111; }
+  .inverted ~ .nav button:hover { border-color: #fff; color: #fff; }
+
+  .slide-num {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 3rem;
+    font-size: 0.8rem;
+    color: #ccc;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<div class="slide active centered">
+  <h1>Your software.<br><span class="highlight">Your rules.</span></h1>
+  <p>Vibemod lets non-developers add features to the apps they use every day.</p>
+</div>
+
+<div class="slide">
+  <h2>You've wished your app<br>could do <span class="highlight">that one thing.</span></h2>
+  <p>File a feature request. Wait months. Get told it's not on the roadmap. Give up. Sound familiar?</p>
+</div>
+
+<div class="slide inverted centered">
+  <h2>What if you could just<br>tell it what to do?</h2>
+  <div class="pill-row">
+    <span class="pill">Describe</span>
+    <span class="pill">Preview</span>
+    <span class="pill">Keep</span>
+  </div>
+</div>
+
+<div class="slide centered">
+  <h1 class="highlight">Demo</h1>
+</div>
+
+<div class="slide inverted centered">
+  <h1>Thanks.</h1>
+  <p>Questions?</p>
+</div>
+
+<div class="nav" id="nav-btns">
+  <button onclick="prev()">&#8592;</button>
+  <button onclick="next()">&#8594;</button>
+</div>
+<div class="slide-num" id="slide-num"></div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const slideNum = document.getElementById('slide-num');
+
+  function show(i) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(i, slides.length - 1));
+    slides[current].classList.add('active');
+    slideNum.textContent = String(current + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
+  }
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') prev();
+  });
+  show(0);
+</script>
+</body>
+</html>

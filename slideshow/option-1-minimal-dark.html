@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibemod - Option 1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: #0a0a0a;
+    color: #f0f0f0;
+    overflow: hidden;
+  }
+  .slide {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 8vw;
+    text-align: center;
+  }
+  .slide.active { display: flex; }
+  h1 { font-size: 5vw; font-weight: 700; margin-bottom: 1.5rem; }
+  h2 { font-size: 3.5vw; font-weight: 600; margin-bottom: 1.5rem; }
+  p, li { font-size: 2vw; line-height: 1.7; color: #b0b0b0; }
+  .big-p { font-size: 2.5vw; max-width: 65vw; }
+  ul { list-style: none; text-align: left; }
+  ul li { margin-bottom: 0.5em; }
+  ul li::before { content: "→ "; color: #6366f1; }
+  .accent { color: #6366f1; }
+  .controls {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 10;
+  }
+  .controls button {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #999;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .controls button:hover { background: #252525; color: #fff; }
+  .progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #6366f1;
+    transition: width 0.3s;
+  }
+  .counter {
+    position: fixed;
+    bottom: 2.2rem;
+    left: 2rem;
+    font-size: 0.85rem;
+    color: #444;
+  }
+</style>
+</head>
+<body>
+
+<div class="slide active">
+  <h1><span class="accent">Vibemod</span></h1>
+  <p class="big-p">Add the feature you always wanted to the software you already use — no coding required.</p>
+</div>
+
+<div class="slide">
+  <h2>The Problem</h2>
+  <p class="big-p">You use an app every day. You know exactly what's missing. But you can't change it — you're not a developer.</p>
+</div>
+
+<div class="slide">
+  <h2>What If You Could?</h2>
+  <ul>
+    <li>Open the app you already use</li>
+    <li>Describe the change you want in plain English</li>
+    <li>See it happen live</li>
+    <li>Keep it</li>
+  </ul>
+</div>
+
+<div class="slide">
+  <h2 class="accent">Demo</h2>
+  <p class="big-p">Let's add a feature to a real app.</p>
+</div>
+
+<div class="slide">
+  <h1><span class="accent">Thanks</span></h1>
+  <p>Questions?</p>
+</div>
+
+<div class="controls">
+  <button onclick="prev()">&#8592;</button>
+  <button onclick="next()">&#8594;</button>
+</div>
+<div class="progress" id="progress"></div>
+<div class="counter" id="counter"></div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+
+  function show(i) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(i, slides.length - 1));
+    slides[current].classList.add('active');
+    progress.style.width = ((current + 1) / slides.length * 100) + '%';
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+  }
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') prev();
+  });
+  show(0);
+</script>
+</body>
+</html>
