@@ -1,0 +1,22 @@
+export function getEditButtonScript(editorPort: number): string {
+  return `
+<script data-vibemod-injected>
+(function() {
+  var btn = document.createElement('a');
+  btn.href = location.protocol + '//' + location.hostname + ':${editorPort}';
+  btn.title = 'Edit in vibemod';
+  btn.setAttribute('style',
+    'position:fixed;bottom:20px;right:20px;z-index:2147483647;' +
+    'width:48px;height:48px;border-radius:50%;' +
+    'background:#111;color:#fff;border:none;cursor:pointer;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'box-shadow:0 2px 8px rgba(0,0,0,0.3);text-decoration:none;' +
+    'transition:transform 0.15s ease,box-shadow 0.15s ease'
+  );
+  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+  btn.onmouseenter = function() { btn.style.transform = 'scale(1.1)'; btn.style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)'; };
+  btn.onmouseleave = function() { btn.style.transform = ''; btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)'; };
+  document.body.appendChild(btn);
+})();
+</script>`;
+}

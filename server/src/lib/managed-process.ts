@@ -1,5 +1,6 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import { createConnection } from 'net';
+import { readFileSync } from 'fs';
 import express from 'express';
 import { createServer, type Server } from 'http';
 import path from 'path';
@@ -8,6 +9,7 @@ import { createLogger } from './logger.js';
 interface ManagedProcessOptions {
   label: string;
   port: number;
+  injectHtml?: string;
 }
 
 export class ManagedProcess {
@@ -16,10 +18,12 @@ export class ManagedProcess {
   private log;
   readonly label: string;
   readonly port: number;
+  private readonly injectHtml?: string;
 
-  constructor({ label, port }: ManagedProcessOptions) {
+  constructor({ label, port, injectHtml }: ManagedProcessOptions) {
     this.label = label;
     this.port = port;
+    this.injectHtml = injectHtml;
     this.log = createLogger(label);
   }
 
@@ -139,10 +143,17 @@ export class ManagedProcess {
   private startStatic(appDir: string, startFile: string): Promise<void> {
     return new Promise((resolve) => {
       const app = express();
-      app.use(express.static(appDir));
-      app.get('*', (_req, res) => {
-        res.sendFile(path.join(appDir, startFile));
-      });
+      const sendHtml = this.injectHtml
+        ? (_req: express.Request, res: express.Response) => {
+            const html = readFileSync(path.join(appDir, startFile), 'utf-8');
+            res.type('html').send(html.replace('</body>', this.injectHtml + '\n</body>'));
+          }
+        : (_req: express.Request, res: express.Response) => {
+            res.sendFile(path.join(appDir, startFile));
+          };
+
+      app.use(express.static(appDir, { index: !this.injectHtml }));
+      app.get('*', sendHtml);
       this.staticServer = createServer(app);
       this.staticServer.listen(this.port, () => {
         this.log.info({ port: this.port, startFile }, 'static server ready');
