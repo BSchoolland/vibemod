@@ -89,7 +89,7 @@ function MessageBubble({ message, isStreamingMsg }: { message: ChatMessage; isSt
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+        className={`max-w-[85%] px-4 py-2.5 text-sm whitespace-pre-wrap break-words overflow-hidden leading-relaxed ${
           isUser
             ? 'rounded-2xl rounded-br-md bg-gradient-primary text-white'
             : 'rounded-2xl rounded-bl-md bg-secondary text-secondary-foreground border border-border/50'
@@ -127,7 +127,7 @@ export function ChatSidebar({ messages, toolEvents, onSend, isSending, isStreami
 
   return (
     <div className="flex flex-col w-[420px] shrink-0 bg-card rounded-2xl border border-border/50 overflow-hidden card-neon">
-      <div className="flex-1 overflow-y-auto p-5 space-y-3" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-3" ref={scrollRef}>
         {messages.length === 0 && !isSending && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4 px-6">
             <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center glow-pink">
