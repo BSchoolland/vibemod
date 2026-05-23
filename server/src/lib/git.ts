@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { rm } from 'fs/promises';
 import type { WorktreeInfo } from '../types.js';
 
 const execFileAsync = promisify(execFile);
@@ -15,6 +16,7 @@ export async function createWorktree(repoPath: string, branchName: string, workt
     await git(args, repoPath);
   } catch (err: any) {
     if (err.stderr?.includes('already exists')) {
+      await rm(worktreePath, { recursive: true, force: true });
       await git(['worktree', 'prune'], repoPath);
       await git(['branch', '-D', branchName], repoPath).catch(() => {});
       await git(args, repoPath);
